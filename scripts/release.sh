@@ -81,6 +81,7 @@ if (( PUBLISH )); then
   else
     gh release create "v$VERSION" dist/Meowse.zip --title "Meowse $VERSION" --generate-notes
   fi
+  scripts/tap.sh || echo "Homebrew tap not updated; run scripts/tap.sh."
 else
   echo "Not published. Re-run with --publish, or attach dist/Meowse.zip to a v$VERSION GitHub release."
 fi

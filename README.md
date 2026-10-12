@@ -22,7 +22,11 @@ macOS 14 Sonoma or later, on Apple silicon or Intel.
 
 ## Installation
 
-1. Download `Meowse.zip` from the [latest release](https://github.com/salvcy/meowse/releases/latest) and move **Meowse** to your Applications folder.
+1. Download `Meowse.zip` from the [latest release](https://github.com/salvcy/meowse/releases/latest) and move **Meowse** to your Applications folder. Or install it with [Homebrew](https://brew.sh):
+
+   ```sh
+   brew install --cask salvcy/tap/meowse
+   ```
 2. Open Meowse. When asked, turn on Meowse in **System Settings → Privacy & Security → Accessibility**. Meowse picks this up within a few seconds; no relaunch needed.
 
 Settings → General shows whether Accessibility is allowed and the scroll engine is running.
