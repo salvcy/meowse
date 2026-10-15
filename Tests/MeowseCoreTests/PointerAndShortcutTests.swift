@@ -96,25 +96,77 @@ final class PointerTests: XCTestCase {
         XCTAssertEqual(c.pointerSpeed(at: 3, acceleration: 0, linear: true), 0.1 * 3 * 1600 / 96, accuracy: 1e-9)
     }
 
-    func testMeowseLeavesTheMacsSettingUntilAskedOtherwise() {
+    func testMeowseLeavesTheMacsSettingsUntilAskedOtherwise() {
         let mac = PointerInfo(acceleration: 1, linear: false, curves: nil)
         var s = Settings()
-        XCTAssertNil(Pointer.value(s, mac: mac))
-        s.pointerSpeed = 2
-        XCTAssertEqual(Pointer.value(s, mac: mac), 2)
+        XCTAssertNil(Pointer.override(s, mac: mac))
+        // Off: the speed scales movement, starting from the Mac's.
         s.pointerAcceleration = false
-        XCTAssertEqual(Pointer.value(s, mac: mac), -1)
-        s.pointerSpeed = nil
+        XCTAssertEqual(Pointer.override(s, mac: mac), PointerOverride(acceleration: 1, linear: true, curve: nil))
+        s.pointerSpeed = 2
+        XCTAssertEqual(Pointer.override(s, mac: mac)?.acceleration, 2)
+        // On: the mouse's own curve, or the user's.
         s.pointerAcceleration = true
-        XCTAssertEqual(Pointer.value(s, mac: mac), 1)  // the Mac's speed
-        // Acceleration turned off the old way: turning it on starts at 1.
-        XCTAssertEqual(Pointer.value(s, mac: PointerInfo(acceleration: -1, linear: false, curves: nil)), 1)
-        // Off in System Settings: only the speed can change.
+        XCTAssertEqual(Pointer.override(s, mac: mac), PointerOverride(acceleration: 1, linear: false, curve: nil))
+        s.pointerCurve = [.init(5, 20), .init(15, 90), .init(30, 150)]
+        XCTAssertNotNil(Pointer.override(s, mac: mac)?.curve)
+        // Off in System Settings: Meowse can turn it back on.
         let linear = PointerInfo(acceleration: 0.5, linear: true, curves: nil)
         XCTAssertFalse(linear.accelerates)
-        XCTAssertEqual(Pointer.value(s, mac: linear), 0.5)
-        s.pointerSpeed = 2
-        XCTAssertEqual(Pointer.value(s, mac: linear), 2)
+        XCTAssertEqual(Pointer.override(Settings(), mac: linear), nil)
+        var on = Settings()
+        on.pointerAcceleration = true
+        XCTAssertEqual(Pointer.override(on, mac: linear)?.linear, false)
+        // Off the old way: a speed of 1 to start from.
+        var off = Settings()
+        off.pointerSpeed = nil
+        off.pointerAcceleration = false
+        XCTAssertEqual(Pointer.override(off, mac: PointerInfo(acceleration: -1, linear: false, curves: nil))?.acceleration, 1)
+    }
+
+    func testAShapedCurvePassesThroughItsPoints() {
+        let points: [PointerCurves.Point] = [.init(5, 20), .init(15, 90), .init(30, 150)]
+        let c = PointerCurves.fit(points)
+        for p in points { XCTAssertEqual(c.speed(at: p.x), p.y, accuracy: 1e-6) }
+        // Past the last point it levels off but keeps rising.
+        XCTAssertGreaterThan(c.speed(at: 40), 150)
+        XCTAssertLessThan(c.speed(at: 40) - 150, 150 - c.speed(at: 20))
+    }
+
+    func testCurvesTheSystemCantFollowStillRiseFromZero() {
+        for points: [PointerCurves.Point] in [
+            [.init(5, 100), .init(15, 20), .init(30, 150)],  // a dip
+            [.init(5, 80), .init(15, 85), .init(30, 10)],    // falling at the end
+            [.init(5, 0), .init(15, 0), .init(30, 0)],
+            [.init(5, 1), .init(15, 50), .init(30, 51)],
+        ] {
+            let c = PointerCurves.fit(points)
+            XCTAssertGreaterThanOrEqual(c.gainLinear, 0)
+            XCTAssertEqual(c.speed(at: 0), 0, accuracy: 1e-9)
+            var last = 0.0
+            for i in 1...80 {
+                let y = c.speed(at: Double(i) / 2)
+                XCTAssertGreaterThanOrEqual(y, last - 1e-9, "\(points)")
+                XCTAssertFalse(y.isNaN)
+                last = y
+            }
+        }
+    }
+
+    func testTheMacsOwnCurveIsShapedAtThreeSpeeds() {
+        let c = PointerCurves()
+        XCTAssertEqual(c.handles.count, 3)
+        XCTAssertEqual(c.handles, c.handles.sorted())
+        XCTAssertLessThan(c.handles.last!, c.span)
+        // Its three points make a curve close to it.
+        let fitted = PointerCurves.fit(c.handles.map { .init($0, c.pointerSpeed(at: $0, acceleration: 1)) })
+        for x in c.handles { XCTAssertEqual(fitted.speed(at: x), c.pointerSpeed(at: x, acceleration: 1), accuracy: 1e-6) }
+    }
+
+    func testOnlyAppleMiceAreLeftForExternalOnly() {
+        XCTAssertTrue(Pointer.isApple(vendor: 0x05AC))
+        XCTAssertTrue(Pointer.isApple(vendor: 0x004C))
+        XCTAssertFalse(Pointer.isApple(vendor: 0x046D))
     }
 }
 
@@ -140,6 +192,21 @@ final class ShortcutTests: XCTestCase {
         XCTAssertEqual(c.eventMask, bit(.scrollWheel))
         XCTAssertEqual(c.wheelKeys(left: false), cmdW)
         XCTAssertNil(c.wheelKeys(left: true))
+    }
+
+    func testSideButtonsGoBackAndForwardByDefault() {
+        let c = EngineConfig(Settings())
+        XCTAssertEqual(c.buttonKeys[3]?.name, "Back")
+        XCTAssertEqual(c.buttonKeys[4]?.name, "Forward")
+        XCTAssertNotEqual(c.eventMask & bit(.otherMouseDown), 0)
+    }
+
+    func testArrowShortcutsCarryTheFlagsAKeyboardSends() {
+        let missionControl = KeyCombo.presets.first { $0.name == "Mission Control" }!.keys
+        let fn = CGEventFlags.maskSecondaryFn.rawValue, pad = CGEventFlags.maskNumericPad.rawValue
+        XCTAssertEqual(missionControl.eventFlags, CGEventFlags.maskControl.rawValue | fn | pad)
+        XCTAssertEqual(cmdW.eventFlags, CGEventFlags.maskCommand.rawValue)
+        XCTAssertEqual(cmdW.name, "⌘W")
     }
 
     func testUnsetOrSwitchedOffShortcutsCostNothing() {
@@ -174,7 +241,13 @@ final class ShortcutTests: XCTestCase {
         let old = try JSONDecoder().decode(Settings.self, from: Data("{}".utf8))
         XCTAssertNil(old.pointerAcceleration)
         XCTAssertNil(old.pointerSpeed)
-        XCTAssertTrue(old.buttonShortcuts.isEmpty)
+        XCTAssertNil(old.pointerCurve)
+        XCTAssertEqual(old.buttonShortcuts, Settings().buttonShortcuts)
+        // A curve needs three usable points.
+        let bad = #"{"pointerCurve":[{"x":1,"y":2},{"x":-3,"y":3},{"x":4,"y":5}]}"#
+        XCTAssertNil(try JSONDecoder().decode(Settings.self, from: Data(bad.utf8)).pointerCurve)
+        let short = #"{"pointerCurve":[{"x":1,"y":2}]}"#
+        XCTAssertNil(try JSONDecoder().decode(Settings.self, from: Data(short.utf8)).pointerCurve)
     }
 
     func testLabels() {

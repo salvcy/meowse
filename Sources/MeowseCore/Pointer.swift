@@ -6,8 +6,8 @@ import Foundation
 /// A mouse brings either parametric curves or a table of points; one that
 /// brings neither gets the system's built-in table. Each curve belongs to an
 /// acceleration value (the number System Settings' Tracking speed sets), and
-/// a value between two curves blends them. Apps may set that value but not
-/// the curves themselves, so it's the one thing Meowse changes.
+/// a value between two curves blends them. A curve of the user's own, which
+/// Meowse gives the mouse, replaces them all (`fit`).
 ///
 /// Speeds are in the system's standardized units: mouse speed as the curves
 /// take it, and pointer speed as they return it.
@@ -34,6 +34,9 @@ public struct PointerCurves: Codable, Equatable, Sendable {
         }
 
         var isValid: Bool { gainLinear != 0 || gainParabolic != 0 || gainCubic != 0 || gainQuartic != 0 }
+
+        /// Pointer speed for mouse speed `x`, as the system computes it.
+        public func speed(at x: Double) -> Double { Curve(self).speed(at: x) }
     }
 
     public struct Point: Codable, Equatable, Sendable {
@@ -71,6 +74,9 @@ public struct PointerCurves: Codable, Equatable, Sendable {
     /// Tracking speed's range in System Settings.
     public static let accelerationRange = 0.0...3.0
 
+    /// Where a curve of the user's own is shaped: slow, medium and fast.
+    public var handles: [Double] { [0.15, 0.45, 0.8].map { $0 * span } }
+
     /// Pointer speed for mouse speed `x`. A negative acceleration turns it
     /// off, so the pointer moves exactly as far as the mouse reports; with
     /// `linear` (System Settings' Pointer acceleration off) the value scales
@@ -98,6 +104,65 @@ public struct PointerCurves: Codable, Equatable, Sendable {
     // per inch, and pointer acceleration below this as this.
     static let cursorDPI = 96.0
     static let minimumLinear = 0.1
+
+    // MARK: Curves of the user's own
+
+    /// The parametric curve through `points` (slow, medium and fast), as
+    /// near as the system's curves allow: one that rises from zero and keeps
+    /// rising. Like the system's own curves, it follows a cubic up to the
+    /// middle point, then a square root that levels off, aimed at the fast
+    /// point. The square root's slope where it starts fixes the cubic's slope
+    /// at the middle point, which makes the cubic exact.
+    public static func fit(_ points: [Point]) -> Parametric {
+        let p = points.sorted { $0.x < $1.x }
+        guard p.count == 3, p[0].x > 0, p[1].x > p[0].x, p[2].x > p[1].x else {
+            return Parametric(index: 0, gainLinear: 1)
+        }
+        let (x1, y1) = (p[0].x, max(p[0].y, 0))
+        let (x2, y2) = (p[1].x, max(p[1].y, 0.01))
+        let (x3, y3) = (p[2].x, p[2].y)
+        let slope = max(0, (y3 * y3 - y2 * y2) / (2 * y2 * (x3 - x2)))
+        // Rows: the value at the slow point, at the middle point, and the slope there.
+        let rows = [[x1, x1 * x1, x1 * x1 * x1], [x2, x2 * x2, x2 * x2 * x2], [1, 2 * x2, 3 * x2 * x2]]
+        let rhs = [y1, y2, slope]
+        // The system squares the parabolic gain, so that term can't be
+        // negative; nor can the slope at zero. Where the exact curve needs
+        // either, the nearest one without.
+        var a = leastSquares(rows, rhs, [0, 1, 2])
+        if a[1] < 0 { a = leastSquares(rows, rhs, [0, 2]) }
+        if a[0] < 0 { a = leastSquares(rows, rhs, [1, 2]) }
+        if a[1] < 0 || a[0] < 0 { a = leastSquares(rows, rhs, [2]) }
+        let a1 = max(0, a[0]), a2 = max(0, a[1])
+        // Rising all the way to the middle point: with the slope at zero and
+        // there both non-negative, it is in between.
+        let a3 = max(a[2], -(a1 + 2 * a2 * x2) / (3 * x2 * x2))
+        return Parametric(index: 0, gainLinear: a1, gainParabolic: a2.squareRoot(), gainCubic: cbrt(a3),
+                          tangentLinear: x2, tangentRoot: x2)
+    }
+
+    /// Least squares for the coefficients in `columns`; the rest are zero.
+    private static func leastSquares(_ rows: [[Double]], _ rhs: [Double], _ columns: [Int]) -> [Double] {
+        let n = columns.count
+        var m = [[Double]](repeating: [Double](repeating: 0, count: n + 1), count: n)
+        for (row, y) in zip(rows, rhs) {
+            let v = columns.map { row[$0] }
+            for i in 0..<n {
+                for j in 0..<n { m[i][j] += v[i] * v[j] }
+                m[i][n] += v[i] * y
+            }
+        }
+        for c in 0..<n {
+            guard let pivot = (c..<n).max(by: { abs(m[$0][c]) < abs(m[$1][c]) }), m[pivot][c] != 0 else { continue }
+            m.swapAt(c, pivot)
+            for r in 0..<n where r != c {
+                let f = m[r][c] / m[c][c]
+                for k in c...n { m[r][k] -= f * m[c][k] }
+            }
+        }
+        var out = [0.0, 0.0, 0.0]
+        for (i, column) in columns.enumerated() where m[i][i] != 0 { out[column] = m[i][n] / m[i][i] }
+        return out
+    }
 
     // MARK: Parametric curves
 
@@ -271,25 +336,62 @@ public struct PointerInfo: Codable, Equatable, Sendable {
     public var linear: Bool
     /// The connected mouse's curves; nil when no mouse is connected.
     public var curves: PointerCurves?
+    /// Whether this macOS lets Meowse set the pointer at all.
+    public var adjustable: Bool
 
-    public init(acceleration: Double, linear: Bool, curves: PointerCurves?) {
+    public init(acceleration: Double, linear: Bool, curves: PointerCurves?, adjustable: Bool = true) {
         self.acceleration = acceleration
         self.linear = linear
         self.curves = curves
+        self.adjustable = adjustable
     }
 
     /// Whether macOS accelerates the pointer.
     public var accelerates: Bool { acceleration >= 0 && !linear }
+
+    /// The Tracking speed to pick the mouse's own curve with.
+    public var trackingSpeed: Double { acceleration >= 0 ? acceleration : 1 }
+
+    /// The Mac's settings as a mouse has them.
+    public var own: PointerOverride { PointerOverride(acceleration: acceleration, linear: linear, curve: nil) }
+}
+
+/// What Meowse gives a mouse in place of the Mac's settings.
+public struct PointerOverride: Equatable, Sendable {
+    /// The Tracking speed value, or with `linear` the speed itself.
+    public var acceleration: Double
+    /// Acceleration off: each count of movement goes `acceleration` times as far.
+    public var linear: Bool
+    /// A curve of the user's own; nil keeps the mouse's.
+    public var curve: PointerCurves.Parametric?
+
+    public init(acceleration: Double, linear: Bool, curve: PointerCurves.Parametric?) {
+        self.acceleration = acceleration
+        self.linear = linear
+        self.curve = curve
+    }
 }
 
 public enum Pointer {
-    /// The acceleration value to give each mouse, or nil to leave macOS's.
-    /// Meowse can't change Pointer acceleration in System Settings: with it
-    /// off there, only the speed can be set.
-    public static func value(_ s: Settings, mac: PointerInfo) -> Double? {
-        guard s.pointerAcceleration != nil || s.pointerSpeed != nil else { return nil }
-        let speed = s.pointerSpeed ?? (mac.acceleration >= 0 ? mac.acceleration : 1)
-        if mac.linear { return speed }
-        return (s.pointerAcceleration ?? mac.accelerates) ? speed : -1
+    /// What to give each mouse, or nil to leave the Mac's settings.
+    public static func override(_ s: Settings, mac: PointerInfo) -> PointerOverride? {
+        guard s.pointerAcceleration != nil || s.pointerSpeed != nil || s.pointerCurve != nil else { return nil }
+        if s.pointerAcceleration ?? mac.accelerates {
+            return PointerOverride(acceleration: mac.trackingSpeed, linear: false,
+                                   curve: s.pointerCurve.map(PointerCurves.fit))
+        }
+        return PointerOverride(acceleration: s.pointerSpeed ?? mac.trackingSpeed, linear: true, curve: nil)
     }
+
+    /// Speeds without acceleration, as System Settings offers them.
+    public static let speedRange = 0.1...3.0
+
+    /// The pointer speed for mouse speed `x` under `o`, or the Mac's settings.
+    public static func speed(at x: Double, _ o: PointerOverride, curves: PointerCurves) -> Double {
+        if let curve = o.curve { return curve.speed(at: x) }
+        return curves.pointerSpeed(at: x, acceleration: o.acceleration, linear: o.linear)
+    }
+
+    /// Mice that keep the Mac's settings when Meowse sets only external ones.
+    public static func isApple(vendor: Int) -> Bool { vendor == 0x05AC || vendor == 0x004C }
 }

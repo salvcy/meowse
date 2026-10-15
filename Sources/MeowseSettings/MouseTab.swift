@@ -9,7 +9,13 @@ struct MouseTab: View {
     var body: some View {
         Form {
             if let mac = store.pointer {
-                pointer(mac)
+                if mac.adjustable {
+                    pointer(mac)
+                } else {
+                    Section {
+                        Text("This version of macOS doesn’t let Meowse change the pointer.").foregroundStyle(.secondary)
+                    }
+                }
             } else {
                 Section { Text("Reading your Mac’s pointer settings…").foregroundStyle(.secondary) }
             }
@@ -19,171 +25,314 @@ struct MouseTab: View {
 
     @ViewBuilder private func pointer(_ mac: PointerInfo) -> some View {
         let s = store.settings
-        // What the mice get: Meowse's value, or the Mac's own.
-        let value = Pointer.value(s, mac: mac) ?? mac.acceleration
-        let customized = s.pointerAcceleration != nil || s.pointerSpeed != nil
+        let customized = s.pointerAcceleration != nil || s.pointerSpeed != nil || s.pointerCurve != nil
+        // What the mice get: Meowse's settings, or the Mac's own.
+        let shown = Pointer.override(s, mac: mac) ?? mac.own
+        let line = shown.linear || shown.acceleration < 0
         Section {
             Toggle(isOn: Binding(
-                get: { value >= 0 && !mac.linear },
+                get: { !line },
                 set: { store.settings.pointerAcceleration = $0 }
             )) {
                 Text("Mouse acceleration")
                 Text("Faster movements take the pointer farther.")
             }
-            .disabled(mac.linear)
 
             if let curves = mac.curves {
-                AccelerationGraph(curves: curves, value: value, linear: mac.linear,
-                                  mac: customized ? mac.acceleration : nil) { store.settings.pointerSpeed = $0 }
+                PointerGraph(curves: curves, shown: shown, mac: customized ? mac.own : nil,
+                             commitCurve: { store.settings.pointerCurve = $0 },
+                             commitSpeed: { store.settings.pointerSpeed = $0 })
+                    .frame(height: 180)
                     .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
             } else {
-                Text("Connect a mouse to see its curve.").foregroundStyle(.secondary)
+                Text(s.pointerExternalOnly ? "Connect an external mouse to see its curve." : "Connect a mouse to see its curve.")
+                    .foregroundStyle(.secondary)
             }
 
             HStack {
-                if value >= 0 {
-                    Text("Speed \(String(format: "%.2f", value))").monospacedDigit().foregroundStyle(.secondary)
-                    if customized && mac.acceleration >= 0 && value != mac.acceleration {
-                        Text("macOS \(String(format: "%.2f", mac.acceleration))").monospacedDigit().foregroundStyle(.tertiary)
-                    }
-                }
+                Text(readout(shown, custom: s.pointerCurve != nil)).monospacedDigit().foregroundStyle(.secondary)
                 Spacer()
-                Button("Use macOS Setting") {
+                Button("Use macOS Settings") {
                     store.settings.pointerAcceleration = nil
                     store.settings.pointerSpeed = nil
+                    store.settings.pointerCurve = nil
                 }
                 .disabled(!customized)
             }
             .font(.callout)
         } footer: {
-            VStack(alignment: .leading, spacing: 6) {
-                if mac.linear {
-                    caption("Pointer acceleration is off in System Settings → Mouse → Advanced, so here you can change the speed but not turn acceleration on.")
-                    Button("Open Mouse Settings…") {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Mouse-Settings.extension")!)
-                    }
-                    .controlSize(.small)
-                } else if value < 0 {
-                    caption("Without acceleration the pointer moves as far as the mouse reports, so its speed is set by the mouse’s own DPI.")
-                } else {
-                    caption("Drag the curve to change how quickly the pointer speeds up. It starts as your Mac’s Tracking speed, and goes back to it when Meowse quits.")
-                }
+            caption(line
+                ? "Without acceleration the pointer goes the same distance for every bit the mouse moves. Drag the dot to set how far."
+                : "Drag the dots to shape the curve: the left one for slow, careful movements, the right one for fast ones. It starts as your Mac’s own, which comes back when Meowse quits.")
+        }
+
+        Section {
+            Toggle(isOn: $store.settings.pointerExternalOnly) {
+                Text("Only external mice")
+                Text("The Magic Mouse and trackpads keep your Mac’s settings.")
             }
         }
+    }
+
+    private func readout(_ o: PointerOverride, custom: Bool) -> String {
+        if o.linear { return "Speed \(String(format: "%.2f", o.acceleration))×" }
+        if o.acceleration < 0 { return "Speed set by the mouse" }
+        return custom ? "Your curve" : "macOS curve"
     }
 }
 
 /// How far the pointer goes for each speed of the mouse, as the system
-/// computes it. Dragging moves the curve through the mouse's own family of
-/// curves, the only change macOS allows apps to make.
-private struct AccelerationGraph: View {
+/// computes it. With acceleration on, three dots shape a curve of the
+/// user's own; with it off, one dot sets the speed.
+///
+/// It's an AppKit view that draws itself: a SwiftUI `Canvas` here cost the
+/// Settings window about 75 MB while the tab was open.
+private struct PointerGraph: NSViewRepresentable {
     let curves: PointerCurves
-    /// The acceleration value in use; negative when it's off.
-    let value: Double
-    let linear: Bool
-    /// The Mac's own value, drawn for comparison while Meowse's differs.
-    let mac: Double?
-    let commit: (Double) -> Void
+    /// What the mice get now.
+    let shown: PointerOverride
+    /// The Mac's own settings, drawn for comparison while Meowse's differ.
+    let mac: PointerOverride?
+    let commitCurve: ([PointerCurves.Point]) -> Void
+    let commitSpeed: (Double) -> Void
 
-    /// The value under the pointer while dragging; committed on release, so
-    /// the pointer doesn't change speed under the drag.
-    @State private var preview: Double?
+    func makeNSView(context: Context) -> GraphView { GraphView() }
 
-    private var adjustable: Bool { value >= 0 || linear }
-    private var span: Double { curves.span }
-    /// Where the handle sits, and where a drag is measured.
-    private var handleX: Double { span * 0.45 }
-    /// A fixed height, so the curve moves rather than the frame. Speeds
-    /// past 2 run off the top only where the pointer is already very fast.
-    private var top: Double {
-        let fast = curves.pointerSpeed(at: span, acceleration: 2, linear: linear)
-        return max(fast, adjustable ? 0 : curves.pointerSpeed(at: span, acceleration: -1)) * 1.08
+    func updateNSView(_ view: GraphView, context: Context) {
+        view.model = GraphModel(curves: curves, shown: shown, mac: mac)
+        view.commitCurve = commitCurve
+        view.commitSpeed = commitSpeed
     }
 
-    var body: some View {
-        let shown = preview ?? value
-        GeometryReader { geo in
-            let size = geo.size
-            Canvas { ctx, size in
-                draw(&ctx, size, shown)
-            }
-            .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 0)
-                .onChanged { drag in
-                    guard adjustable else { return }
-                    preview = solve(forPointer: (1 - drag.location.y / size.height) * top)
-                }
-                .onEnded { _ in
-                    if let preview, preview != value { commit(preview) }
-                    preview = nil
-                })
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: GraphView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 440, height: 180)
+    }
+}
+
+/// The curves and dots, in the system's speed units.
+struct GraphModel: Equatable {
+    var curves: PointerCurves
+    var shown: PointerOverride
+    var mac: PointerOverride?
+
+    var span: Double { curves.span }
+    /// A fixed height, so the curve moves rather than the frame.
+    var top: Double {
+        max(curves.pointerSpeed(at: span, acceleration: 2),
+            curves.pointerSpeed(at: span, acceleration: 1, linear: true) * 1.5) * 1.08
+    }
+
+    static func isLine(_ o: PointerOverride) -> Bool { o.linear || o.acceleration < 0 }
+    var handles: [Double] { Self.isLine(shown) ? [span * 0.45] : curves.handles }
+    func speed(_ x: Double, _ o: PointerOverride) -> Double { Pointer.speed(at: x, o, curves: curves) }
+
+    /// The settings with one dot moved to pointer speed `y`, the others
+    /// where they were (`ys`); with no dot, all of them as given.
+    func moved(_ ys: [Double], dot: Int?, to y: Double) -> PointerOverride {
+        if Self.isLine(shown) {
+            let raw = curves.pointerSpeed(at: handles[0], acceleration: 1, linear: true)
+            let speed = min(max(y / raw, Pointer.speedRange.lowerBound), Pointer.speedRange.upperBound)
+            return PointerOverride(acceleration: (speed * 100).rounded() / 100, linear: true, curve: nil)
         }
-        .frame(height: 170)
-        .overlay(alignment: .topLeading) { axis("Pointer speed").padding(6) }
-        .overlay(alignment: .bottomTrailing) { axis("Mouse speed").padding(6) }
-        .accessibilityElement()
-        .accessibilityLabel("Acceleration curve")
-        .accessibilityValue(value >= 0 ? String(format: "%.2f", value) : "Off")
-        .accessibilityAdjustableAction { direction in
-            guard adjustable else { return }
-            let step = direction == .increment ? 0.125 : -0.125
-            commit(min(max(value + step, 0), PointerCurves.accelerationRange.upperBound))
+        var ys = ys
+        if let dot { ys[dot] = max(y, 0.5) }
+        let curve = PointerCurves.fit(zip(handles, ys).map { PointerCurves.Point($0, $1) })
+        return PointerOverride(acceleration: shown.acceleration, linear: false, curve: curve)
+    }
+}
+
+final class GraphView: NSView {
+    var model: GraphModel? {
+        didSet { if model != oldValue { update() } }
+    }
+    var commitCurve: ([PointerCurves.Point]) -> Void = { _ in }
+    var commitSpeed: (Double) -> Void = { _ in }
+
+    /// Shown while dragging; committed when the drag ends, so the pointer
+    /// doesn't change speed under it.
+    private var preview: PointerOverride?
+    /// The dot being dragged, and where all the dots were when it started.
+    private var drag: (index: Int, start: [Double])?
+
+    // Shape layers, not draw(_:): a view that draws its own bitmap here made
+    // the window server hold about 90 MB of graphics memory for the window.
+    private let grid = CAShapeLayer()
+    private let mac = CAShapeLayer()
+    private let curve = CAShapeLayer()
+    private let dots = CAShapeLayer()
+    private let labels = [CATextLayer(), CATextLayer()]
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        layer?.masksToBounds = true
+        for l in [grid, mac, curve, dots] as [CAShapeLayer] {
+            l.fillColor = nil
+            layer?.addSublayer(l)
         }
-        .help(adjustable ? "Drag up for a faster pointer, down for a slower one." : "")
+        grid.lineWidth = 0.5
+        mac.lineWidth = 1.5
+        mac.lineDashPattern = [4, 3]
+        curve.lineWidth = 2
+        curve.lineCap = .round
+        curve.lineJoin = .round
+        dots.lineWidth = 2
+        for (label, text) in zip(labels, ["Pointer speed", "Mouse speed"]) {
+            label.string = text
+            label.font = NSFont.systemFont(ofSize: 10)
+            label.fontSize = 10
+            layer?.addSublayer(label)
+        }
     }
 
-    private func axis(_ text: String) -> some View {
-        Text(text).font(.caption2).foregroundStyle(.tertiary)
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var isFlipped: Bool { true }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func layout() {
+        super.layout()
+        update()
     }
 
-    private func point(_ x: Double, _ y: Double, _ size: CGSize) -> CGPoint {
-        CGPoint(x: x / span * size.width, y: size.height - min(y / top, 1.02) * size.height)
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        update()
     }
 
-    private func path(_ a: Double, _ size: CGSize) -> Path {
-        Path { p in
+    // MARK: Dragging
+
+    override func mouseDown(with event: NSEvent) {
+        guard let model else { return }
+        let x = convert(event.locationInWindow, from: nil).x / bounds.width * model.span
+        let xs = model.handles
+        let i = xs.indices.min { abs(xs[$0] - x) < abs(xs[$1] - x) } ?? 0
+        drag = (i, xs.map { model.speed($0, model.shown) })
+        mouseDragged(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let model, let drag else { return }
+        let y = convert(event.locationInWindow, from: nil).y
+        let speed = min(max((1 - y / bounds.height) * model.top, 0), model.top)
+        preview = model.moved(drag.start, dot: drag.index, to: speed)
+        update()
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            preview = nil
+            drag = nil
+            update()
+        }
+        guard let model, let preview else { return }
+        commit(preview, model)
+    }
+
+    func commit(_ o: PointerOverride, _ model: GraphModel) {
+        if GraphModel.isLine(o) {
+            commitSpeed(o.acceleration)
+        } else if let curve = o.curve {
+            // The dots sit on the curve the mouse gets.
+            commitCurve(model.curves.handles.map { PointerCurves.Point($0, curve.speed(at: $0)) })
+        }
+    }
+
+    // MARK: Drawing
+
+    private func update() {
+        guard let model, let layer, bounds.width > 0 else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        let o = preview ?? model.shown
+        let size = bounds.size
+        // Colors resolved for this view's light or dark appearance.
+        var colors: (background: CGColor, separator: CGColor, secondary: CGColor, tertiary: CGColor, accent: CGColor) = (.clear, .clear, .clear, .clear, .clear)
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            colors = (NSColor.textBackgroundColor.withAlphaComponent(0.6).cgColor, NSColor.separatorColor.cgColor,
+                      NSColor.secondaryLabelColor.cgColor, NSColor.tertiaryLabelColor.cgColor, NSColor.controlAccentColor.cgColor)
+        }
+        layer.backgroundColor = colors.background
+        layer.contentsScale = window?.backingScaleFactor ?? 2
+
+        func point(_ x: Double, _ y: Double) -> CGPoint {
+            CGPoint(x: x / model.span * size.width, y: size.height - min(y / model.top, 1.02) * size.height)
+        }
+        func path(_ o: PointerOverride) -> CGPath {
+            let p = CGMutablePath()
             let steps = 120
             for i in 0...steps {
-                let x = span * Double(i) / Double(steps)
-                let pt = point(x, curves.pointerSpeed(at: x, acceleration: a, linear: linear), size)
+                let x = model.span * Double(i) / Double(steps)
+                let pt = point(x, model.speed(x, o))
                 i == 0 ? p.move(to: pt) : p.addLine(to: pt)
             }
+            return p
         }
-    }
 
-    private func draw(_ ctx: inout GraphicsContext, _ size: CGSize, _ shown: Double) {
-        let frame = Path(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 6)
-        ctx.fill(frame, with: .style(.background.opacity(0.6)))
-        var grid = Path()
+        let g = CGMutablePath()
         for i in 1..<4 {
             let x = size.width * Double(i) / 4, y = size.height * Double(i) / 4
-            grid.move(to: CGPoint(x: x, y: 0)); grid.addLine(to: CGPoint(x: x, y: size.height))
-            grid.move(to: CGPoint(x: 0, y: y)); grid.addLine(to: CGPoint(x: size.width, y: y))
+            g.move(to: CGPoint(x: x, y: 0)); g.addLine(to: CGPoint(x: x, y: size.height))
+            g.move(to: CGPoint(x: 0, y: y)); g.addLine(to: CGPoint(x: size.width, y: y))
         }
-        ctx.stroke(grid, with: .style(.quaternary), lineWidth: 0.5)
+        grid.path = g
+        grid.strokeColor = colors.separator
 
-        if let mac, mac != shown {
-            ctx.stroke(path(mac, size), with: .style(.secondary), style: StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+        if let m = model.mac, m != o {
+            mac.path = path(m)
+            mac.strokeColor = colors.secondary
+        } else {
+            mac.path = nil
         }
-        ctx.stroke(path(shown, size), with: .color(.accentColor), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+        curve.path = path(o)
+        curve.strokeColor = colors.accent
 
-        if adjustable {
-            let c = point(handleX, curves.pointerSpeed(at: handleX, acceleration: shown, linear: linear), size)
-            let dot = Path(ellipseIn: CGRect(x: c.x - 6, y: c.y - 6, width: 12, height: 12))
-            ctx.fill(dot, with: .color(.accentColor))
-            ctx.stroke(dot, with: .color(.white), lineWidth: 2)
+        let d = CGMutablePath()
+        for (i, x) in model.handles.enumerated() {
+            let c = point(x, model.speed(x, o))
+            let r = drag?.index == i ? 7.0 : 6.0
+            d.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+        }
+        dots.path = d
+        dots.fillColor = colors.accent
+        dots.strokeColor = .white
+
+        for l in [grid, mac, curve, dots] as [CAShapeLayer] { l.frame = layer.bounds }
+        labels[0].frame = CGRect(x: 6, y: 5, width: 120, height: 14)
+        labels[1].frame = CGRect(x: size.width - 126, y: size.height - 19, width: 120, height: 14)
+        labels[1].alignmentMode = .right
+        for l in labels {
+            l.foregroundColor = colors.tertiary
+            l.contentsScale = layer.contentsScale
         }
     }
 
-    /// The value whose curve passes through `y` at the handle. Curves rise
-    /// with the value, so halving the range finds it.
-    private func solve(forPointer y: Double) -> Double {
-        var lo = PointerCurves.accelerationRange.lowerBound, hi = PointerCurves.accelerationRange.upperBound
-        for _ in 0..<30 {
-            let mid = (lo + hi) / 2
-            if curves.pointerSpeed(at: handleX, acceleration: mid, linear: linear) < y { lo = mid } else { hi = mid }
-        }
-        // Two decimals, as shown.
-        return ((lo + hi) / 2 * 100).rounded() / 100
+    // MARK: Accessibility
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .slider }
+    override func accessibilityLabel() -> String? {
+        model.map { GraphModel.isLine($0.shown) ? "Pointer speed" : "Acceleration curve" }
+    }
+    override func accessibilityValue() -> Any? {
+        guard let o = model?.shown else { return nil }
+        return GraphModel.isLine(o) ? String(format: "%.2f times", o.acceleration) : "Custom"
+    }
+    override func accessibilityPerformIncrement() -> Bool { step(up: true) }
+    override func accessibilityPerformDecrement() -> Bool { step(up: false) }
+
+    /// Speed up or slow down: the speed by a tenth, or every dot by 10%.
+    private func step(up: Bool) -> Bool {
+        guard let model else { return false }
+        let ys = model.handles.map { model.speed($0, model.shown) * (up ? 1.1 : 0.9) }
+        let o = GraphModel.isLine(model.shown)
+            ? PointerOverride(acceleration: min(max(model.shown.acceleration + (up ? 0.1 : -0.1), Pointer.speedRange.lowerBound),
+                                                Pointer.speedRange.upperBound), linear: true, curve: nil)
+            : model.moved(ys, dot: nil, to: 0)
+        commit(o, model)
+        return true
     }
 }

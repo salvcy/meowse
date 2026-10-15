@@ -9,8 +9,10 @@ final class RouterAndConfigTests: XCTestCase {
     private let lCmd: UInt64 = CGEventFlags.maskCommand.rawValue | 0x8
     private let lAlt: UInt64 = CGEventFlags.maskAlternate.rawValue | 0x20
 
+    /// Scroll settings alone: the side buttons' default actions are tested with the shortcuts.
     private func cfg(_ edit: (inout Settings) -> Void = { _ in }) -> EngineConfig {
         var s = Settings()
+        s.buttonShortcutsOn = false
         edit(&s)
         return EngineConfig(s)
     }
@@ -51,6 +53,7 @@ final class RouterAndConfigTests: XCTestCase {
             for smooth in [false, true] {
                 for reverse in [false, true] {
                     var settings = Settings()
+                    settings.buttonShortcutsOn = false
                     settings.smooth = smooth
                     settings.reverseVertical = reverse
                     settings.reverseHorizontal = reverse

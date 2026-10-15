@@ -18,6 +18,48 @@ public struct KeyCombo: Codable, Hashable, Sendable {
         self.key = key
     }
 
+    /// Flags for posting it. A keyboard marks the arrows, and the keys an
+    /// Fn key reaches on a laptop, with the function flag (the arrows with
+    /// the keypad flag too); system shortcuts such as Mission Control's ⌃↑
+    /// match only with them.
+    public var eventFlags: UInt64 {
+        var flags = modifiers
+        switch keyCode {
+        case 123...126:
+            flags |= CGEventFlags.maskSecondaryFn.rawValue | CGEventFlags.maskNumericPad.rawValue
+        case 115, 116, 117, 119, 121, 122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, 105, 107, 113, 106, 64, 79, 80, 90:
+            flags |= CGEventFlags.maskSecondaryFn.rawValue
+        default:
+            break
+        }
+        return flags
+    }
+
+    /// Common actions for mouse buttons, so the side buttons can go back
+    /// and forward without recording anything.
+    public static let presets: [(name: String, keys: KeyCombo)] = {
+        let cmd = CGEventFlags.maskCommand.rawValue, ctrl = CGEventFlags.maskControl.rawValue
+        let shift = CGEventFlags.maskShift.rawValue
+        return [
+            ("Back", KeyCombo(keyCode: 33, modifiers: cmd, key: "[")),
+            ("Forward", KeyCombo(keyCode: 30, modifiers: cmd, key: "]")),
+            ("Previous Tab", KeyCombo(keyCode: 48, modifiers: ctrl | shift, key: "⇥")),
+            ("Next Tab", KeyCombo(keyCode: 48, modifiers: ctrl, key: "⇥")),
+            ("Mission Control", KeyCombo(keyCode: 126, modifiers: ctrl, key: "↑")),
+            ("App Windows", KeyCombo(keyCode: 125, modifiers: ctrl, key: "↓")),
+            ("Space Left", KeyCombo(keyCode: 123, modifiers: ctrl, key: "←")),
+            ("Space Right", KeyCombo(keyCode: 124, modifiers: ctrl, key: "→")),
+        ]
+    }()
+
+    public static let back = presets[0].keys
+    public static let forward = presets[1].keys
+
+    /// The preset's name, or the keys: "Back", "⌘W".
+    public var name: String {
+        Self.presets.first { $0.keys.keyCode == keyCode && $0.keys.modifiers == modifiers }?.name ?? displayName
+    }
+
     /// "⇧⌘ ]", in the order macOS menus use.
     public var displayName: String {
         var s = ""

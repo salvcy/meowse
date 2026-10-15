@@ -12,8 +12,8 @@
 - **Reverse direction**, vertically and horizontally, independent of the trackpad setting.
 - **Hold-to-modify hotkeys**: hold a modifier key or mouse button while scrolling to scroll faster, scroll horizontally, or turn smoothing off. Set one by pressing it.
 - **Excluded apps** keep the wheel exactly as it is, for games and 3D tools that handle it themselves.
-- **Mouse acceleration** on or off, with a curve you drag to change how quickly the pointer speeds up. Your Mac's own setting comes back when Meowse quits.
-- **Button shortcuts**: extra mouse buttons and side-wheel directions can press key combinations.
+- **Mouse acceleration**: shape the curve by dragging three points, or turn acceleration off and set the speed. Optionally only for external mice. Your Mac's own settings come back when Meowse quits.
+- **Mouse buttons**: the side buttons go back and forward in every app, and any extra button or side-wheel direction can do another action or press a shortcut.
 - **Simulated trackpad momentum**, so apps rubber-band and treat the glide as a fling.
 - **Keep Awake** for 15 minutes to 4 hours in one click, until a time you pick, or until turned off, optionally letting the display sleep or keeping a MacBook running with its lid closed.
 - **Wiggle Cursor** to stay active in chat apps while you're away from the keyboard.
@@ -50,7 +50,7 @@ Meowse is built to be invisible when it isn't working:
 
 - **Zero idle cost.** No polling and no repeating timers. With the menu closed and nothing scrolling, it uses 0% CPU and has no wakeups, apart from the once-a-day update check, which you can turn off.
 - **Under 9 MB of memory** at launch. The system allocator runs in its space-efficient mode, and Settings runs as its own process, so the memory it uses goes back to the system when its window closes. macOS leaves memory behind in every menu bar app when displays change; once that has doubled Meowse's launch memory, it starts over while the display is asleep.
-- **One event tap**, configured for only the events your settings need, and absent entirely when nothing is enabled. It never sees your keystrokes; modifier hotkeys are read from the scroll event itself. Mouse buttons reach it only once one has a shortcut, and pointer movement never does: acceleration is set in macOS itself.
+- **One event tap**, configured for only the events your settings need, and absent entirely when nothing is enabled. It never sees your keystrokes; modifier hotkeys are read from the scroll event itself. Mouse buttons reach it only while one has an action (the side buttons do by default), and pointer movement never does: acceleration is applied by macOS itself.
 - **A dedicated scroll thread** with no locks or allocations on the event path, so a busy app never delays your scrolling.
 - **Fewer events per glide.** A glide moves in whole points, the smallest step a scroll event can carry, so every event moves the page. On a 120 Hz display a wheel notch takes 42% fewer events than one per frame, and the glide still lands on its exact distance.
 - **Frame-rate independent.** Glides feel the same at 60, 120 and 144 Hz, even when one moves to a display with a different refresh rate, and run at your display's full refresh rate.

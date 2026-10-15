@@ -9,8 +9,12 @@ public struct Settings: Codable, Equatable, Sendable {
 
     // Mouse pointer. Nil follows the Mac's own setting.
     public var pointerAcceleration: Bool?
-    /// The acceleration value, as System Settings' Tracking speed sets it.
+    /// Speed without acceleration: how many times as far each count goes.
     public var pointerSpeed: Double?
+    /// A curve of the user's own: the pointer speed at a few mouse speeds.
+    public var pointerCurve: [PointerCurves.Point]?
+    /// Leave the Magic Mouse with the Mac's settings.
+    public var pointerExternalOnly = true
 
     // Smoothing
     public var smooth = true
@@ -42,9 +46,13 @@ public struct Settings: Codable, Equatable, Sendable {
     /// A click stops a glide in flight.
     public var stopOnClick = true
 
-    // Mouse buttons
+    // Mouse buttons. The side buttons go back and forward everywhere, not
+    // only in apps that read them.
     public var buttonShortcutsOn = true
-    public var buttonShortcuts: [ButtonShortcut] = []
+    public var buttonShortcuts: [ButtonShortcut] = [
+        ButtonShortcut(trigger: .button(3), keys: .back),
+        ButtonShortcut(trigger: .button(4), keys: .forward),
+    ]
 
     // Awake. Sessions aren't persisted; these preferences are.
     /// Keep the system awake but let the display sleep.
@@ -70,6 +78,8 @@ public struct Settings: Codable, Equatable, Sendable {
         read(.showMenuBarIcon, &s.showMenuBarIcon)
         read(.pointerAcceleration, &s.pointerAcceleration)
         read(.pointerSpeed, &s.pointerSpeed)
+        read(.pointerCurve, &s.pointerCurve)
+        read(.pointerExternalOnly, &s.pointerExternalOnly)
         read(.smooth, &s.smooth)
         read(.smoothVertical, &s.smoothVertical)
         read(.smoothHorizontal, &s.smoothHorizontal)
@@ -97,7 +107,10 @@ public struct Settings: Codable, Equatable, Sendable {
         s.glideTime = s.glideTime.clamped(to: Self.glideTimeRange)
         s.fasterFactor = s.fasterFactor.clamped(to: Self.fasterFactorRange)
         s.wiggleInterval = s.wiggleInterval.clamped(to: Awake.wiggleIntervals.min()!...Awake.wiggleIntervals.max()!)
-        s.pointerSpeed = s.pointerSpeed.map { $0.clamped(to: PointerCurves.accelerationRange) }
+        s.pointerSpeed = s.pointerSpeed.map { $0.clamped(to: Pointer.speedRange) }
+        if let curve = s.pointerCurve, curve.count != 3 || curve.contains(where: { !($0.x > 0 && $0.y >= 0 && $0.x.isFinite && $0.y.isFinite) }) {
+            s.pointerCurve = nil
+        }
         // One row per button or wheel direction.
         var triggers = Set<MouseTrigger>()
         s.buttonShortcuts = s.buttonShortcuts.filter { $0.trigger.isValid && triggers.insert($0.trigger).inserted }

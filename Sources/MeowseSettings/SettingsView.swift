@@ -5,6 +5,8 @@ import MeowseCore
 extension View {
     func settingsTab() -> some View {
         formStyle(.grouped)
+            // The window fits the form, so it only scrolls on a screen too short for it.
+            .scrollBounceBehavior(.basedOnSize)
             .frame(width: 480)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -213,7 +215,7 @@ private struct MouseButtonsSection: View {
         Section {
             Toggle(isOn: $store.settings.buttonShortcutsOn) {
                 Text("Use extra buttons as shortcuts")
-                Text("A button or side wheel with a shortcut presses its keys instead of doing what it normally does.")
+                Text("A button or side wheel with an action does it instead of what it normally does. The side buttons go back and forward.")
             }
             Group {
                 ForEach(store.settings.buttonShortcuts, id: \.trigger) { shortcut in
@@ -232,15 +234,41 @@ private struct MouseButtonsSection: View {
     private func row(_ shortcut: ButtonShortcut) -> some View {
         LabeledContent(shortcut.trigger.displayName) {
             HStack(spacing: 6) {
-                RecorderField(label: shortcut.keys?.displayName, empty: "Set shortcut", prompt: "Type a shortcut…",
-                              recording: capture.target == .shortcut(shortcut.trigger)) {
-                    record(shortcut.trigger)
+                if capture.target == .shortcut(shortcut.trigger) {
+                    RecorderField(label: nil, empty: "", prompt: "Type a shortcut…", recording: true) { capture.stop() }
+                } else {
+                    actions(shortcut)
                 }
                 ClearButton(help: "Remove") {
                     store.settings.buttonShortcuts.removeAll { $0.trigger == shortcut.trigger }
                 }
             }
         }
+    }
+
+    /// Ready-made actions, or a shortcut of the user's own.
+    private func actions(_ shortcut: ButtonShortcut) -> some View {
+        Menu {
+            ForEach(KeyCombo.presets, id: \.name) { preset in
+                Button {
+                    set(shortcut.trigger, preset.keys)
+                } label: {
+                    Text(preset.name)
+                    Text(preset.keys.displayName)
+                }
+            }
+            Divider()
+            Button("Record Shortcut…") { record(shortcut.trigger) }
+        } label: {
+            Text(shortcut.keys?.name ?? "Choose…")
+        }
+        .fixedSize()
+        .frame(minWidth: 140, alignment: .trailing)
+    }
+
+    private func set(_ trigger: MouseTrigger, _ keys: KeyCombo) {
+        guard let i = store.settings.buttonShortcuts.firstIndex(where: { $0.trigger == trigger }) else { return }
+        store.settings.buttonShortcuts[i].keys = keys
     }
 
     private var addRow: some View {
@@ -258,8 +286,6 @@ private struct MouseButtonsSection: View {
                         if !s.buttonShortcuts.contains(where: { $0.trigger == trigger }) {
                             store.settings.buttonShortcuts.append(ButtonShortcut(trigger: trigger))
                         }
-                        // Straight on to its shortcut.
-                        DispatchQueue.main.async { record(trigger) }
                         return .finish
                     }
                 } label: {
@@ -271,9 +297,8 @@ private struct MouseButtonsSection: View {
 
     private func record(_ trigger: MouseTrigger) {
         capture.start(.shortcut(trigger)) { event in
-            guard let keys = Recorded.shortcut(event),
-                  let i = store.settings.buttonShortcuts.firstIndex(where: { $0.trigger == trigger }) else { return .keep }
-            store.settings.buttonShortcuts[i].keys = keys
+            guard let keys = Recorded.shortcut(event) else { return .keep }
+            set(trigger, keys)
             return .finish
         }
     }
@@ -431,13 +456,36 @@ struct UpdatesTab: View {
 
 // MARK: - Excluded apps
 
-/// Apps whose scrolling Meowse leaves alone.
+/// Apps whose scrolling Meowse leaves alone: a row that opens a list.
+///
+/// Opening it changes the window's height. The rows appear in one step,
+/// without animation: an animated expansion would run against the window's
+/// resize and flicker the scroll bar.
 private struct ExcludedApps: View {
     @ObservedObject var store: SettingsStore
     @State private var open = false
 
     var body: some View {
-        DisclosureGroup(isExpanded: $open) {
+        Button {
+            open.toggle()
+        } label: {
+            HStack {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(open ? 90 : 0))
+                    .frame(width: 12)
+                Text("Excluded apps")
+                Spacer()
+                if !store.settings.excludedApps.isEmpty {
+                    Text("\(store.settings.excludedApps.count)").foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityValue(open ? "Expanded" : "Collapsed")
+        if open {
             ForEach(store.settings.excludedApps, id: \.bundleID) { app in
                 HStack(spacing: 8) {
                     Image(nsImage: Self.icon(app)).resizable().frame(width: 18, height: 18)
@@ -452,24 +500,15 @@ private struct ExcludedApps: View {
                     .help("Stop excluding \(app.name)")
                     .accessibilityLabel("Remove \(app.name)")
                 }
+                .padding(.leading, 20)
             }
-            HStack {
+            VStack(alignment: .leading, spacing: 6) {
                 Button(action: choose) {
                     Label("Add an App…", systemImage: "plus")
                 }
-                Spacer()
+                caption("Meowse doesn’t smooth, reverse or otherwise change the wheel in these apps. Handy for ones with wheel handling of their own, such as games and 3D tools.")
             }
-            caption("Meowse doesn’t smooth, reverse or otherwise change the wheel in these apps. Handy for ones with wheel handling of their own, such as games and 3D tools.")
-        } label: {
-            HStack {
-                Text("Excluded apps")
-                Spacer()
-                if !store.settings.excludedApps.isEmpty {
-                    Text("\(store.settings.excludedApps.count)").foregroundStyle(.secondary).monospacedDigit()
-                }
-            }
-            .contentShape(Rectangle())
-            .onTapGesture { withAnimation { open.toggle() } }
+            .padding(.leading, 20)
         }
     }
 

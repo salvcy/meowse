@@ -3,91 +3,125 @@ import IOKit
 import IOKit.hidsystem
 import MeowseCore
 
-/// Gives each mouse the acceleration value Meowse's settings ask for, the
-/// same number System Settings' Tracking speed sets (see `PointerCurves`),
-/// and puts the Mac's own value back when they no longer ask or Meowse quits.
-/// Nothing is watched or held while the Mac's setting is followed.
+/// Gives each mouse the pointer settings Meowse's settings ask for (see
+/// `PointerOverride`), and puts the Mac's own back when they no longer ask
+/// or Meowse quits. The system applies them, so pointer movement never
+/// passes through Meowse. Nothing is watched or held while the Mac's
+/// settings are followed.
 final class PointerControl {
 
     /// Called on the main thread when a mouse connects.
     var onDevicesChange: (() -> Void)?
 
-    private var wanted: Double?
-    /// Set while a value of Meowse's is on the mice.
-    private var applied = false
-    /// Held only while Meowse's value is applied.
+    private var wanted: PointerOverride?
+    private var externalOnly = true
+    /// What each mouse has from Meowse, by registry ID.
+    private var applied: [UInt64: PointerOverride] = [:]
+    /// Held only while Meowse's settings are applied.
     private var client: IOHIDEventSystemClient?
     private var port: IONotificationPortRef?
     private var added: io_iterator_t = 0
     private var pending: DispatchWorkItem?
 
-    private static let key = "HIDMouseAcceleration" as CFString
+    private static let accelerationKey = "HIDMouseAcceleration" as CFString
     private static let linearKey = "HIDUseLinearScalingMouseAcceleration" as CFString
+    private static let curvesKey = "UserPointerAccelCurvesKey" as CFString
 
-    private func connection() -> IOHIDEventSystemClient {
-        client ?? IOHIDEventSystemClientCreateSimpleClient(kCFAllocatorDefault)
+    /// A passive HID client. The public simple client may set only the
+    /// Tracking speed value; this one may also set a curve and turn
+    /// acceleration off. It's private API, looked up when used, so a macOS
+    /// without it leaves the Mac's settings alone (`PointerInfo.adjustable`).
+    private static let createClient: (@convention(c) (CFAllocator?, Int32, CFDictionary?) -> Unmanaged<IOHIDEventSystemClient>?)? = {
+        guard let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "IOHIDEventSystemClientCreateWithType") else { return nil }
+        return unsafeBitCast(symbol, to: (@convention(c) (CFAllocator?, Int32, CFDictionary?) -> Unmanaged<IOHIDEventSystemClient>?).self)
+    }()
+    private static let passive: Int32 = 2
+
+    private func connection() -> IOHIDEventSystemClient? {
+        client ?? Self.createClient?(kCFAllocatorDefault, Self.passive, nil)?.takeRetainedValue()
     }
 
-    /// Applies the settings' value, or the Mac's when they have none.
+    /// Applies the settings, or the Mac's own when they have none.
     func update(_ settings: Settings) {
-        let following = settings.pointerAcceleration == nil && settings.pointerSpeed == nil
-        guard !following || applied else { return }
-        let c = connection()
+        let customized = settings.pointerAcceleration != nil || settings.pointerSpeed != nil || settings.pointerCurve != nil
+        guard customized || !applied.isEmpty, let c = connection() else { return }
         let mac = Self.macSettings(c)
-        wanted = Pointer.value(settings, mac: mac)
-        if let wanted {
+        wanted = customized ? Pointer.override(settings, mac: mac) : nil
+        externalOnly = settings.pointerExternalOnly
+        sync(c, mac)
+        if wanted != nil {
             client = c
-            apply(wanted, c)
-            applied = true
             watchDevices(true)
         } else {
-            apply(mac.acceleration, c)
-            applied = false
             watchDevices(false)
             client = nil
         }
     }
 
-    /// Puts the value back after something else may have reset it.
+    /// Gives every mouse its settings again, after something else (a wake,
+    /// a mouse connecting) may have reset them.
     func reapply() {
-        if let wanted, let client { apply(wanted, client) }
+        guard wanted != nil, let client else { return }
+        applied.removeAll()
+        sync(client, Self.macSettings(client))
     }
 
-    /// Restores the Mac's value, on quit.
+    /// Restores the Mac's settings, on quit.
     func restore() {
-        guard applied else { return }
-        let c = connection()
-        apply(Self.macSettings(c).acceleration, c)
-        applied = false
+        guard !applied.isEmpty, let c = connection() else { return }
+        wanted = nil
+        sync(c, Self.macSettings(c))
     }
 
-    /// The Mac's settings and the curves of the mouse in use, for Settings.
-    func info() -> PointerInfo {
-        let c = connection()
+    /// The Mac's settings and the curves of the mouse Meowse would change, for Settings.
+    func info(externalOnly: Bool) -> PointerInfo {
+        guard let c = connection() else {
+            return PointerInfo(acceleration: 1, linear: false, curves: nil, adjustable: false)
+        }
         var info = Self.macSettings(c)
-        info.curves = Self.mice(c).first.flatMap(Self.curves)
+        info.curves = Self.mice(c).first { !externalOnly || !Self.isApple($0) }.flatMap(Self.curves)
         return info
     }
 
     // MARK: - Services
 
-    private func apply(_ value: Double, _ client: IOHIDEventSystemClient) {
-        let fixed = NSNumber(value: Int32((value * 65536).rounded()))
-        for mouse in Self.mice(client) {
-            if (IOHIDServiceClientCopyProperty(mouse, Self.key) as? NSNumber) == fixed { continue }
-            if !IOHIDServiceClientSetProperty(mouse, Self.key, fixed) {
-                NSLog("Meowse: couldn't set pointer acceleration")
+    private func sync(_ c: IOHIDEventSystemClient, _ mac: PointerInfo) {
+        for mouse in Self.mice(c) {
+            guard let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { continue }
+            if let wanted, !externalOnly || !Self.isApple(mouse) {
+                if applied[id] != wanted {
+                    Self.set(mouse, wanted)
+                    applied[id] = wanted
+                }
+            } else if applied.removeValue(forKey: id) != nil {
+                Self.set(mouse, mac.own)
             }
         }
+        if wanted == nil { applied.removeAll() }
+    }
+
+    private static func set(_ mouse: IOHIDServiceClient, _ o: PointerOverride) {
+        let fixed = { (v: Double) in NSNumber(value: Int64((v * 65536).rounded())) }
+        // An empty list gives the mouse its own curves back.
+        let curves: [[String: NSNumber]] = o.curve.map { c in
+            [["HIDAccelIndex": fixed(c.index), "HIDAccelGainLinear": fixed(c.gainLinear),
+              "HIDAccelGainParabolic": fixed(c.gainParabolic), "HIDAccelGainCubic": fixed(c.gainCubic),
+              "HIDAccelGainQuartic": fixed(c.gainQuartic), "HIDAccelTangentSpeedLinear": fixed(c.tangentLinear),
+              "HIDAccelTangentSpeedParabolicRoot": fixed(c.tangentRoot)]]
+        } ?? []
+        let ok = IOHIDServiceClientSetProperty(mouse, curvesKey, curves as CFArray)
+            && IOHIDServiceClientSetProperty(mouse, linearKey, NSNumber(value: o.linear ? 1 : 0))
+            && IOHIDServiceClientSetProperty(mouse, accelerationKey, fixed(o.acceleration))
+        if !ok { NSLog("Meowse: couldn't set the pointer settings") }
     }
 
     /// Services whose pointer follows the mouse Tracking speed, the
     /// connected mice first. Keyboards with a pointer part are in the list
-    /// too: they never move it, and they accept the value harmlessly.
+    /// too: they never move it, and they accept the settings harmlessly.
     private static func mice(_ client: IOHIDEventSystemClient) -> [IOHIDServiceClient] {
         let all = IOHIDEventSystemClientCopyServices(client) as? [IOHIDServiceClient] ?? []
         let mice = all.filter {
-            (IOHIDServiceClientCopyProperty($0, "HIDPointerAccelerationType" as CFString) as? String) == key as String
+            (IOHIDServiceClientCopyProperty($0, "HIDPointerAccelerationType" as CFString) as? String) == accelerationKey as String
         }
         return mice.filter { isMouse($0) } + mice.filter { !isMouse($0) }
     }
@@ -97,7 +131,12 @@ final class PointerControl {
             && (IOHIDServiceClientCopyProperty(s, kIOHIDPrimaryUsageKey as CFString) as? Int) == kHIDUsage_GD_Mouse
     }
 
-    /// A mouse's curves, from its registry entry (apps can't read them through the HID client).
+    /// The Magic Mouse, which "external mice only" leaves alone.
+    private static func isApple(_ s: IOHIDServiceClient) -> Bool {
+        Pointer.isApple(vendor: IOHIDServiceClientCopyProperty(s, kIOHIDVendorIDKey as CFString) as? Int ?? 0)
+    }
+
+    /// A mouse's curves, from its registry entry.
     private static func curves(_ mouse: IOHIDServiceClient) -> PointerCurves? {
         guard let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { return nil }
         let entry = IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(id))
@@ -124,7 +163,7 @@ final class PointerControl {
     /// What System Settings has set, which Meowse never changes: its values
     /// live on the HID system as a whole, Meowse's on each mouse.
     private static func macSettings(_ client: IOHIDEventSystemClient) -> PointerInfo {
-        let value = (IOHIDEventSystemClientCopyProperty(client, key) as? NSNumber).map { $0.doubleValue / 65536 }
+        let value = (IOHIDEventSystemClientCopyProperty(client, accelerationKey) as? NSNumber).map { $0.doubleValue / 65536 }
             ?? UserDefaults.standard.double(forKey: "com.apple.mouse.scaling")
         let linear = (IOHIDEventSystemClientCopyProperty(client, linearKey) as? NSNumber)?.boolValue
             ?? UserDefaults.standard.bool(forKey: "com.apple.mouse.linear")
@@ -133,8 +172,8 @@ final class PointerControl {
 
     // MARK: - New mice
 
-    /// A mouse that connects gets the Mac's value from the system; Meowse's
-    /// follows shortly after. Watched only while Meowse has a value applied.
+    /// A mouse that connects gets the Mac's settings from the system;
+    /// Meowse's follow shortly after. Watched only while they're applied.
     private func watchDevices(_ on: Bool) {
         if !on {
             pending?.cancel()
@@ -168,7 +207,7 @@ final class PointerControl {
             self?.onDevicesChange?()
         }
         pending = work
-        // The HID system sets up the new service and gives it the Mac's value first.
+        // The HID system sets up the new service and gives it the Mac's settings first.
         DispatchQueue.main.asyncAfter(deadline: .now() + 1, execute: work)
     }
 }

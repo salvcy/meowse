@@ -293,7 +293,7 @@ final class Engine: NSObject {
     /// Presses and releases a key combination, as a keyboard would.
     private func press(_ keys: KeyCombo) {
         if keySource == nil { keySource = CGEventSource(stateID: .privateState) }
-        let flags = CGEventFlags(rawValue: keys.modifiers)
+        let flags = CGEventFlags(rawValue: keys.eventFlags)
         for down in [true, false] {
             guard let e = CGEvent(keyboardEventSource: keySource, virtualKey: keys.keyCode, keyDown: down) else { return }
             e.flags = flags

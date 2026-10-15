@@ -88,7 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             engineConfig = config
             engine.apply(config)
         }
-        if new.pointerAcceleration != old.pointerAcceleration || new.pointerSpeed != old.pointerSpeed {
+        if new.pointerAcceleration != old.pointerAcceleration || new.pointerSpeed != old.pointerSpeed
+            || new.pointerCurve != old.pointerCurve || new.pointerExternalOnly != old.pointerExternalOnly {
             pointer.update(new)
             refreshPointerInfo()
         }
@@ -261,13 +262,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings(tab: SettingsTab? = nil) {
         store.refreshLaunchAtLogin()
         refreshTrust(prompt: false)
-        store.pointerInfo = pointer.info()
+        store.pointerInfo = pointer.info(externalOnly: store.settings.pointerExternalOnly)
         settingsHost.show(tab: tab)
     }
 
     /// Only Settings shows it, so it's read only while Settings is open.
     private func refreshPointerInfo() {
-        if settingsHost.isOpen { store.pointerInfo = pointer.info() }
+        if settingsHost.isOpen { store.pointerInfo = pointer.info(externalOnly: store.settings.pointerExternalOnly) }
     }
 
     /// Where each excluded app is now, and where it was when added, in case
