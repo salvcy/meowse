@@ -37,6 +37,17 @@ public struct PointerCurves: Codable, Equatable, Sendable {
 
         /// Pointer speed for mouse speed `x`, as the system computes it.
         public func speed(at x: Double) -> Double { Curve(self).speed(at: x) }
+
+        /// The same curve with every pointer speed `k` times as fast. Each
+        /// gain is raised to its power before use, so it scales by that root.
+        public func scaled(_ k: Double) -> Parametric {
+            var c = self
+            c.gainLinear *= k
+            c.gainParabolic *= k.squareRoot()
+            c.gainCubic *= cbrt(k)
+            c.gainQuartic *= pow(k, 0.25)
+            return c
+        }
     }
 
     public struct Point: Codable, Equatable, Sendable {
@@ -76,6 +87,14 @@ public struct PointerCurves: Codable, Equatable, Sendable {
 
     /// Where a curve of the user's own is shaped: slow, medium and fast.
     public var handles: [Double] { [0.15, 0.45, 0.8].map { $0 * span } }
+
+    /// The same curves with every pointer speed `k` times as fast, exactly:
+    /// the system blends curves linearly, so scaling each scales the blend.
+    public func scaled(_ k: Double) -> PointerCurves {
+        PointerCurves(parametric: parametric.map { $0.scaled(k) },
+                      tables: tables.map { Table(acceleration: $0.acceleration, points: $0.points.map { Point($0.x, $0.y * k) }) },
+                      resolution: resolution)
+    }
 
     /// Pointer speed for mouse speed `x`. A negative acceleration turns it
     /// off, so the pointer moves exactly as far as the mouse reports; with
@@ -313,6 +332,20 @@ public struct PointerCurves: Codable, Equatable, Sendable {
         return tables
     }
 
+    /// Tables in the form `tables(from:)` reads, for giving a mouse.
+    public static func data(_ tables: [Table]) -> Data {
+        var bytes: [UInt8] = [0x00, 0x00, 0x80, 0x00, 0x40, 0x32, 0x30, 0x30]  // scale 0.5, signature "@200"
+        func int(_ v: Int, _ size: Int) { for shift in stride(from: (size - 1) * 8, through: 0, by: -8) { bytes.append(UInt8(truncatingIfNeeded: v >> shift)) } }
+        func fixed(_ v: Double) { int(Int(Int32(clamping: Int((v * 65536).rounded()))), 4) }
+        int(tables.count, 2)
+        for t in tables {
+            fixed(t.acceleration)
+            int(t.points.count, 2)
+            for p in t.points { fixed(p.x); fixed(p.y) }
+        }
+        return Data(bytes)
+    }
+
     /// What the system uses for a mouse that brings no curves of its own.
     public static let builtInTable: [Table] = {
         func f(_ v: Int) -> Double { Double(v) / 65536 }
@@ -364,32 +397,43 @@ public struct PointerOverride: Equatable, Sendable {
     public var linear: Bool
     /// A curve of the user's own; nil keeps the mouse's.
     public var curve: PointerCurves.Parametric?
+    /// The mouse's own curve, this many times as fast. Used without `curve`.
+    public var scale: Double
 
-    public init(acceleration: Double, linear: Bool, curve: PointerCurves.Parametric?) {
+    public init(acceleration: Double, linear: Bool, curve: PointerCurves.Parametric?, scale: Double = 1) {
         self.acceleration = acceleration
         self.linear = linear
         self.curve = curve
+        self.scale = scale
     }
+
+    /// Acceleration is off: a straight line.
+    public var isLine: Bool { linear || acceleration < 0 }
 }
 
 public enum Pointer {
     /// What to give each mouse, or nil to leave the Mac's settings.
     public static func override(_ s: Settings, mac: PointerInfo) -> PointerOverride? {
-        guard s.pointerAcceleration != nil || s.pointerSpeed != nil || s.pointerCurve != nil else { return nil }
+        guard s.pointerCustomized else { return nil }
         if s.pointerAcceleration ?? mac.accelerates {
-            return PointerOverride(acceleration: mac.trackingSpeed, linear: false,
-                                   curve: s.pointerCurve.map(PointerCurves.fit))
+            if let points = s.pointerCurve {
+                return PointerOverride(acceleration: mac.trackingSpeed, linear: false, curve: PointerCurves.fit(points))
+            }
+            return PointerOverride(acceleration: mac.trackingSpeed, linear: false, curve: nil, scale: s.pointerScale ?? 1)
         }
         return PointerOverride(acceleration: s.pointerSpeed ?? mac.trackingSpeed, linear: true, curve: nil)
     }
 
     /// Speeds without acceleration, as System Settings offers them.
     public static let speedRange = 0.1...3.0
+    /// How much faster or slower the Mac's own curve can be made.
+    public static let scaleRange = 0.25...4.0
 
     /// The pointer speed for mouse speed `x` under `o`, or the Mac's settings.
     public static func speed(at x: Double, _ o: PointerOverride, curves: PointerCurves) -> Double {
         if let curve = o.curve { return curve.speed(at: x) }
-        return curves.pointerSpeed(at: x, acceleration: o.acceleration, linear: o.linear)
+        let speed = curves.pointerSpeed(at: x, acceleration: o.acceleration, linear: o.linear)
+        return o.isLine ? speed : speed * o.scale
     }
 
     /// Mice that keep the Mac's settings when Meowse sets only external ones.

@@ -12,7 +12,7 @@
 - **Reverse direction**, vertically and horizontally, independent of the trackpad setting.
 - **Hold-to-modify hotkeys**: hold a modifier key or mouse button while scrolling to scroll faster, scroll horizontally, or turn smoothing off. Set one by pressing it.
 - **Excluded apps** keep the wheel exactly as it is, for games and 3D tools that handle it themselves.
-- **Mouse acceleration**: shape the curve by dragging three points, or turn acceleration off and set the speed. Optionally only for external mice. Your Mac's own settings come back when Meowse quits.
+- **Mouse acceleration**: make your Mac's own curve faster or slower, reshape it by dragging three points, or turn acceleration off and set the speed. Optionally only for external mice. Your Mac's own settings come back when Meowse quits.
 - **Mouse buttons**: the side buttons go back and forward in every app, and any extra button or side-wheel direction can do another action or press a shortcut.
 - **Simulated trackpad momentum**, so apps rubber-band and treat the glide as a fling.
 - **Keep Awake** for 15 minutes to 4 hours in one click, until a time you pick, or until turned off, optionally letting the display sleep or keeping a MacBook running with its lid closed.

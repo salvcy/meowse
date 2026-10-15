@@ -17,6 +17,8 @@ final class PointerControl {
     private var externalOnly = true
     /// What each mouse has from Meowse, by registry ID.
     private var applied: [UInt64: PointerOverride] = [:]
+    /// Mice given a table of Meowse's, which gets the mouse's own back afterwards.
+    private var tables: Set<UInt64> = []
     /// Held only while Meowse's settings are applied.
     private var client: IOHIDEventSystemClient?
     private var port: IONotificationPortRef?
@@ -26,6 +28,7 @@ final class PointerControl {
     private static let accelerationKey = "HIDMouseAcceleration" as CFString
     private static let linearKey = "HIDUseLinearScalingMouseAcceleration" as CFString
     private static let curvesKey = "UserPointerAccelCurvesKey" as CFString
+    private static let tableKey = "HIDPointerAccelerationTable" as CFString
 
     /// A passive HID client. The public simple client may set only the
     /// Tracking speed value; this one may also set a curve and turn
@@ -43,7 +46,7 @@ final class PointerControl {
 
     /// Applies the settings, or the Mac's own when they have none.
     func update(_ settings: Settings) {
-        let customized = settings.pointerAcceleration != nil || settings.pointerSpeed != nil || settings.pointerCurve != nil
+        let customized = settings.pointerCustomized
         guard customized || !applied.isEmpty, let c = connection() else { return }
         let mac = Self.macSettings(c)
         wanted = customized ? Pointer.override(settings, mac: mac) : nil
@@ -90,28 +93,48 @@ final class PointerControl {
             guard let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { continue }
             if let wanted, !externalOnly || !Self.isApple(mouse) {
                 if applied[id] != wanted {
-                    Self.set(mouse, wanted)
+                    set(mouse, id, wanted)
                     applied[id] = wanted
                 }
             } else if applied.removeValue(forKey: id) != nil {
-                Self.set(mouse, mac.own)
+                set(mouse, id, mac.own)
             }
         }
         if wanted == nil { applied.removeAll() }
     }
 
-    private static func set(_ mouse: IOHIDServiceClient, _ o: PointerOverride) {
+    private func set(_ mouse: IOHIDServiceClient, _ id: UInt64, _ o: PointerOverride) {
         let fixed = { (v: Double) in NSNumber(value: Int64((v * 65536).rounded())) }
-        // An empty list gives the mouse its own curves back.
-        let curves: [[String: NSNumber]] = o.curve.map { c in
-            [["HIDAccelIndex": fixed(c.index), "HIDAccelGainLinear": fixed(c.gainLinear),
-              "HIDAccelGainParabolic": fixed(c.gainParabolic), "HIDAccelGainCubic": fixed(c.gainCubic),
-              "HIDAccelGainQuartic": fixed(c.gainQuartic), "HIDAccelTangentSpeedLinear": fixed(c.tangentLinear),
-              "HIDAccelTangentSpeedParabolicRoot": fixed(c.tangentRoot)]]
-        } ?? []
-        let ok = IOHIDServiceClientSetProperty(mouse, curvesKey, curves as CFArray)
-            && IOHIDServiceClientSetProperty(mouse, linearKey, NSNumber(value: o.linear ? 1 : 0))
-            && IOHIDServiceClientSetProperty(mouse, accelerationKey, fixed(o.acceleration))
+        func dictionary(_ c: PointerCurves.Parametric) -> [String: NSNumber] {
+            ["HIDAccelIndex": fixed(c.index), "HIDAccelGainLinear": fixed(c.gainLinear),
+             "HIDAccelGainParabolic": fixed(c.gainParabolic), "HIDAccelGainCubic": fixed(c.gainCubic),
+             "HIDAccelGainQuartic": fixed(c.gainQuartic), "HIDAccelTangentSpeedLinear": fixed(c.tangentLinear),
+             "HIDAccelTangentSpeedParabolicRoot": fixed(c.tangentRoot)]
+        }
+        // Curves of Meowse's replace the mouse's; an empty list gives its own back.
+        var curves = o.curve.map { [dictionary($0)] } ?? []
+        var table: Data?
+        if o.curve == nil, !o.isLine, o.scale != 1, let own = Self.curves(mouse) {
+            // The mouse's own curve made faster or slower, in the form it comes in.
+            let scaled = own.scaled(o.scale)
+            if scaled.parametric.isEmpty {
+                table = PointerCurves.data(scaled.tables)
+            } else {
+                curves = scaled.parametric.map(dictionary)
+            }
+        }
+        var ok = true
+        if let table {
+            ok = IOHIDServiceClientSetProperty(mouse, Self.tableKey, table as CFData)
+            tables.insert(id)
+        } else if tables.remove(id) != nil, let own = Self.curves(mouse) {
+            ok = IOHIDServiceClientSetProperty(mouse, Self.tableKey, PointerCurves.data(own.tables) as CFData)
+        }
+        // The table isn't read until one of these changes, so it goes first.
+        ok = IOHIDServiceClientSetProperty(mouse, Self.curvesKey, curves as CFArray)
+            && IOHIDServiceClientSetProperty(mouse, Self.linearKey, NSNumber(value: o.linear ? 1 : 0))
+            && IOHIDServiceClientSetProperty(mouse, Self.accelerationKey, fixed(o.acceleration))
+            && ok
         if !ok { NSLog("Meowse: couldn't set the pointer settings") }
     }
 
@@ -136,7 +159,8 @@ final class PointerControl {
         Pointer.isApple(vendor: IOHIDServiceClientCopyProperty(s, kIOHIDVendorIDKey as CFString) as? Int ?? 0)
     }
 
-    /// A mouse's curves, from its registry entry.
+    /// A mouse's own curves, from its registry entry. What Meowse sets lives
+    /// elsewhere on it, so these stay the mouse's.
     private static func curves(_ mouse: IOHIDServiceClient) -> PointerCurves? {
         guard let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { return nil }
         let entry = IOServiceGetMatchingService(kIOMainPortDefault, IORegistryEntryIDMatching(id))

@@ -89,7 +89,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             engine.apply(config)
         }
         if new.pointerAcceleration != old.pointerAcceleration || new.pointerSpeed != old.pointerSpeed
-            || new.pointerCurve != old.pointerCurve || new.pointerExternalOnly != old.pointerExternalOnly {
+            || new.pointerCurve != old.pointerCurve || new.pointerScale != old.pointerScale
+            || new.pointerExternalOnly != old.pointerExternalOnly {
             pointer.update(new)
             refreshPointerInfo()
         }

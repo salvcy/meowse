@@ -25,7 +25,7 @@ struct MouseTab: View {
 
     @ViewBuilder private func pointer(_ mac: PointerInfo) -> some View {
         let s = store.settings
-        let customized = s.pointerAcceleration != nil || s.pointerSpeed != nil || s.pointerCurve != nil
+        let customized = s.pointerCustomized
         // What the mice get: Meowse's settings, or the Mac's own.
         let shown = Pointer.override(s, mac: mac) ?? mac.own
         let line = shown.linear || shown.acceleration < 0
@@ -40,7 +40,11 @@ struct MouseTab: View {
 
             if let curves = mac.curves {
                 PointerGraph(curves: curves, shown: shown, mac: customized ? mac.own : nil,
-                             commitCurve: { store.settings.pointerCurve = $0 },
+                             commitCurve: {
+                                 store.settings.pointerCurve = $0
+                                 store.settings.pointerScale = nil
+                             },
+                             commitScale: { store.settings.pointerScale = $0 },
                              commitSpeed: { store.settings.pointerSpeed = $0 })
                     .frame(height: 180)
                     .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
@@ -56,6 +60,7 @@ struct MouseTab: View {
                     store.settings.pointerAcceleration = nil
                     store.settings.pointerSpeed = nil
                     store.settings.pointerCurve = nil
+                    store.settings.pointerScale = nil
                 }
                 .disabled(!customized)
             }
@@ -63,7 +68,7 @@ struct MouseTab: View {
         } footer: {
             caption(line
                 ? "Without acceleration the pointer goes the same distance for every bit the mouse moves. Drag the dot to set how far."
-                : "Drag the dots to shape the curve: the left one for slow, careful movements, the right one for fast ones. It starts as your Mac’s own, which comes back when Meowse quits.")
+                : "Drag the middle dot to make the whole curve faster or slower. The outer dots reshape it, for slow, careful movements and for fast ones; Option-drag the middle dot to move it alone. Your Mac’s own curve comes back when Meowse quits.")
         }
 
         Section {
@@ -77,7 +82,8 @@ struct MouseTab: View {
     private func readout(_ o: PointerOverride, custom: Bool) -> String {
         if o.linear { return "Speed \(String(format: "%.2f", o.acceleration))×" }
         if o.acceleration < 0 { return "Speed set by the mouse" }
-        return custom ? "Your curve" : "macOS curve"
+        if custom { return "Your curve" }
+        return o.scale == 1 ? "macOS curve" : "macOS curve, \(String(format: "%.2f", o.scale))×"
     }
 }
 
@@ -94,6 +100,7 @@ private struct PointerGraph: NSViewRepresentable {
     /// The Mac's own settings, drawn for comparison while Meowse's differ.
     let mac: PointerOverride?
     let commitCurve: ([PointerCurves.Point]) -> Void
+    let commitScale: (Double) -> Void
     let commitSpeed: (Double) -> Void
 
     func makeNSView(context: Context) -> GraphView { GraphView() }
@@ -101,6 +108,7 @@ private struct PointerGraph: NSViewRepresentable {
     func updateNSView(_ view: GraphView, context: Context) {
         view.model = GraphModel(curves: curves, shown: shown, mac: mac)
         view.commitCurve = commitCurve
+        view.commitScale = commitScale
         view.commitSpeed = commitSpeed
     }
 
@@ -122,7 +130,7 @@ struct GraphModel: Equatable {
             curves.pointerSpeed(at: span, acceleration: 1, linear: true) * 1.5) * 1.08
     }
 
-    static func isLine(_ o: PointerOverride) -> Bool { o.linear || o.acceleration < 0 }
+    static func isLine(_ o: PointerOverride) -> Bool { o.isLine }
     var handles: [Double] { Self.isLine(shown) ? [span * 0.45] : curves.handles }
     func speed(_ x: Double, _ o: PointerOverride) -> Double { Pointer.speed(at: x, o, curves: curves) }
 
@@ -139,6 +147,17 @@ struct GraphModel: Equatable {
         let curve = PointerCurves.fit(zip(handles, ys).map { PointerCurves.Point($0, $1) })
         return PointerOverride(acceleration: shown.acceleration, linear: false, curve: curve)
     }
+
+    /// The whole curve `r` times as fast, keeping its shape: the Mac's own
+    /// exactly, or the user's through its dots. `ys` are the dots' speeds.
+    func scaled(_ ys: [Double], by r: Double) -> PointerOverride {
+        if shown.curve != nil {
+            let curve = PointerCurves.fit(zip(handles, ys).map { PointerCurves.Point($0, $1 * r) })
+            return PointerOverride(acceleration: shown.acceleration, linear: false, curve: curve)
+        }
+        let scale = min(max(shown.scale * r, Pointer.scaleRange.lowerBound), Pointer.scaleRange.upperBound)
+        return PointerOverride(acceleration: shown.acceleration, linear: false, curve: nil, scale: (scale * 100).rounded() / 100)
+    }
 }
 
 final class GraphView: NSView {
@@ -146,13 +165,15 @@ final class GraphView: NSView {
         didSet { if model != oldValue { update() } }
     }
     var commitCurve: ([PointerCurves.Point]) -> Void = { _ in }
+    var commitScale: (Double) -> Void = { _ in }
     var commitSpeed: (Double) -> Void = { _ in }
 
     /// Shown while dragging; committed when the drag ends, so the pointer
     /// doesn't change speed under it.
     private var preview: PointerOverride?
-    /// The dot being dragged, and where all the dots were when it started.
-    private var drag: (index: Int, start: [Double])?
+    /// The dot being dragged, where all the dots were when it started, and
+    /// whether the drag scales the whole curve rather than moving one dot.
+    private var drag: (index: Int, start: [Double], scales: Bool)?
 
     // Shape layers, not draw(_:): a view that draws its own bitmap here made
     // the window server hold about 90 MB of graphics memory for the window.
@@ -209,7 +230,10 @@ final class GraphView: NSView {
         let x = convert(event.locationInWindow, from: nil).x / bounds.width * model.span
         let xs = model.handles
         let i = xs.indices.min { abs(xs[$0] - x) < abs(xs[$1] - x) } ?? 0
-        drag = (i, xs.map { model.speed($0, model.shown) })
+        // Most people only want the curve faster or slower: the middle dot
+        // does that, and Option lets it reshape like the others.
+        let scales = xs.count == 3 && i == 1 && !event.modifierFlags.contains(.option)
+        drag = (i, xs.map { model.speed($0, model.shown) }, scales)
         mouseDragged(with: event)
     }
 
@@ -217,7 +241,11 @@ final class GraphView: NSView {
         guard let model, let drag else { return }
         let y = convert(event.locationInWindow, from: nil).y
         let speed = min(max((1 - y / bounds.height) * model.top, 0), model.top)
-        preview = model.moved(drag.start, dot: drag.index, to: speed)
+        if drag.scales {
+            preview = model.scaled(drag.start, by: max(speed, 0.5) / max(drag.start[drag.index], 0.5))
+        } else {
+            preview = model.moved(drag.start, dot: drag.index, to: speed)
+        }
         update()
     }
 
@@ -237,6 +265,8 @@ final class GraphView: NSView {
         } else if let curve = o.curve {
             // The dots sit on the curve the mouse gets.
             commitCurve(model.curves.handles.map { PointerCurves.Point($0, curve.speed(at: $0)) })
+        } else {
+            commitScale(o.scale)
         }
     }
 
@@ -324,14 +354,14 @@ final class GraphView: NSView {
     override func accessibilityPerformIncrement() -> Bool { step(up: true) }
     override func accessibilityPerformDecrement() -> Bool { step(up: false) }
 
-    /// Speed up or slow down: the speed by a tenth, or every dot by 10%.
+    /// Speed up or slow down: the speed by a tenth, or the whole curve by 10%.
     private func step(up: Bool) -> Bool {
         guard let model else { return false }
-        let ys = model.handles.map { model.speed($0, model.shown) * (up ? 1.1 : 0.9) }
+        let ys = model.handles.map { model.speed($0, model.shown) }
         let o = GraphModel.isLine(model.shown)
             ? PointerOverride(acceleration: min(max(model.shown.acceleration + (up ? 0.1 : -0.1), Pointer.speedRange.lowerBound),
                                                 Pointer.speedRange.upperBound), linear: true, curve: nil)
-            : model.moved(ys, dot: nil, to: 0)
+            : model.scaled(ys, by: up ? 1.1 : 0.9)
         commit(o, model)
         return true
     }

@@ -13,6 +13,8 @@ public struct Settings: Codable, Equatable, Sendable {
     public var pointerSpeed: Double?
     /// A curve of the user's own: the pointer speed at a few mouse speeds.
     public var pointerCurve: [PointerCurves.Point]?
+    /// The Mac's own curve made this many times as fast, without a curve of the user's own.
+    public var pointerScale: Double?
     /// Leave the Magic Mouse with the Mac's settings.
     public var pointerExternalOnly = true
 
@@ -79,6 +81,7 @@ public struct Settings: Codable, Equatable, Sendable {
         read(.pointerAcceleration, &s.pointerAcceleration)
         read(.pointerSpeed, &s.pointerSpeed)
         read(.pointerCurve, &s.pointerCurve)
+        read(.pointerScale, &s.pointerScale)
         read(.pointerExternalOnly, &s.pointerExternalOnly)
         read(.smooth, &s.smooth)
         read(.smoothVertical, &s.smoothVertical)
@@ -108,6 +111,7 @@ public struct Settings: Codable, Equatable, Sendable {
         s.fasterFactor = s.fasterFactor.clamped(to: Self.fasterFactorRange)
         s.wiggleInterval = s.wiggleInterval.clamped(to: Awake.wiggleIntervals.min()!...Awake.wiggleIntervals.max()!)
         s.pointerSpeed = s.pointerSpeed.map { $0.clamped(to: Pointer.speedRange) }
+        s.pointerScale = s.pointerScale.flatMap { $0.isFinite ? $0.clamped(to: Pointer.scaleRange) : nil }
         if let curve = s.pointerCurve, curve.count != 3 || curve.contains(where: { !($0.x > 0 && $0.y >= 0 && $0.x.isFinite && $0.y.isFinite) }) {
             s.pointerCurve = nil
         }
@@ -121,6 +125,11 @@ public struct Settings: Codable, Equatable, Sendable {
         if !s.sidewaysKey.isValid { s.sidewaysKey = defaults.sidewaysKey }
         if !s.unsmoothedKey.isValid { s.unsmoothedKey = defaults.unsmoothedKey }
         self = s
+    }
+
+    /// Meowse sets the pointer instead of leaving the Mac's settings.
+    public var pointerCustomized: Bool {
+        pointerAcceleration != nil || pointerSpeed != nil || pointerCurve != nil || pointerScale != nil
     }
 
     // Slider ranges in Settings.

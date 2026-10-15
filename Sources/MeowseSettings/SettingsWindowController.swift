@@ -13,8 +13,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         tabs.tabStyle = .toolbar
 
         func add<V: View>(_ title: String, _ symbol: String, _ view: V) {
-            let host = NSHostingController(rootView: view)
-            host.sizingOptions = [.preferredContentSize]
+            let host = NSHostingController(rootView: AnyView(EmptyView()))
+            // The window follows the tab's size through preferredContentSize.
+            // SwiftUI would update it midway through drawing a frame, and the
+            // window resized then kept showing the old layout until something
+            // next woke the app: seconds of blank space after a list opened.
+            // Set it just after the frame instead.
+            host.rootView = AnyView(view.onGeometryChange(for: CGSize.self) { $0.size } action: { [weak host] size in
+                DispatchQueue.main.async { host?.preferredContentSize = size }
+            })
+            host.sizingOptions = []
+            host.preferredContentSize = host.sizeThatFits(in: NSSize(width: 480, height: 10_000))
             host.title = title  // becomes the window title
             let item = NSTabViewItem(viewController: host)
             item.label = title
@@ -54,23 +63,25 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-/// Resizes the window to the selected tab's SwiftUI content, anchored at the top.
+/// Resizes the window to the selected tab's SwiftUI content, anchored at
+/// the top. Within a tab, the window follows the content through its
+/// preferredContentSize (see `SettingsWindowController.init`).
 private final class FittingTabViewController: NSTabViewController {
 
     override func tabView(_ tabView: NSTabView, didSelect item: NSTabViewItem?) {
         super.tabView(tabView, didSelect: item)
-        fitWindow(animate: true)
+        fitWindow()
     }
 
-    /// A tab's own content changed (a row appeared or a list opened): the
-    /// window follows at once, so the content never lays out mid-resize.
-    override func preferredContentSizeDidChange(for viewController: NSViewController) {
-        if viewController === tabViewItems[selectedTabViewItemIndex].viewController {
-            fitWindow(animate: false)
+    /// A tab that was hidden may have changed size since it was last shown.
+    override func tabView(_ tabView: NSTabView, willSelect item: NSTabViewItem?) {
+        if let host = item?.viewController as? NSHostingController<AnyView> {
+            host.preferredContentSize = host.sizeThatFits(in: NSSize(width: 480, height: 10_000))
         }
+        super.tabView(tabView, willSelect: item)
     }
 
-    private func fitWindow(animate: Bool) {
+    private func fitWindow() {
         guard let window = view.window,
               let size = tabViewItems[selectedTabViewItemIndex].viewController?.preferredContentSize,
               size.width > 0, size.height > 0 else { return }
@@ -78,6 +89,6 @@ private final class FittingTabViewController: NSTabViewController {
         var frame = window.frame
         frame.origin.y += frame.height - target.height
         frame.size = target.size
-        window.setFrame(frame, display: true, animate: animate && window.isVisible)
+        window.setFrame(frame, display: true, animate: window.isVisible)
     }
 }

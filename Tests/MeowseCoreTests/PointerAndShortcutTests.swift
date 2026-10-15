@@ -163,6 +163,51 @@ final class PointerTests: XCTestCase {
         for x in c.handles { XCTAssertEqual(fitted.speed(at: x), c.pointerSpeed(at: x, acceleration: 1), accuracy: 1e-6) }
     }
 
+    func testScalingKeepsTheMacsCurveExactly() {
+        for curves in [generic, parametric] {
+            let fast = curves.scaled(1.6)
+            for a in [0.0, 0.5, 1.0, 1.25, 2.0] {
+                for x in stride(from: 0.25, through: curves.span * 1.2, by: 0.75) {
+                    XCTAssertEqual(fast.pointerSpeed(at: x, acceleration: a), 1.6 * curves.pointerSpeed(at: x, acceleration: a),
+                                   accuracy: 1e-6 * max(1, curves.pointerSpeed(at: x, acceleration: a)), "x \(x), a \(a)")
+                }
+            }
+        }
+        // A curve of the user's own scales through its dots, and stays the same shape.
+        let points: [PointerCurves.Point] = [.init(5, 20), .init(15, 90), .init(30, 150)]
+        let c = PointerCurves.fit(points), doubled = PointerCurves.fit(points.map { .init($0.x, $0.y * 2) })
+        for x in [1.0, 7.0, 15.0, 22.0, 40.0] { XCTAssertEqual(doubled.speed(at: x), 2 * c.speed(at: x), accuracy: 1e-6) }
+    }
+
+    func testTablesGoBackToTheSystemInTheFormItReads() {
+        XCTAssertEqual(PointerCurves.tables(from: PointerCurves.data(PointerCurves.builtInTable)), PointerCurves.builtInTable)
+        // Byte for byte the table macOS uses for a mouse without one.
+        XCTAssertEqual([UInt8](PointerCurves.data(PointerCurves.builtInTable)).prefix(30),
+                       [0x00, 0x00, 0x80, 0x00, 0x40, 0x32, 0x30, 0x30, 0x00, 0x02,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+                        0x00, 0x01, 0x00, 0x00, 0x00, 0x09])
+    }
+
+    func testTheMiddleDotMakesTheMacsCurveFasterOrSlower() {
+        let mac = PointerInfo(acceleration: 1, linear: false, curves: nil)
+        var s = Settings()
+        s.pointerScale = 1.5
+        XCTAssertTrue(s.pointerCustomized)
+        let o = Pointer.override(s, mac: mac)!
+        XCTAssertEqual(o.scale, 1.5)
+        XCTAssertNil(o.curve)
+        XCTAssertEqual(Pointer.speed(at: 12, o, curves: generic), 1.5 * 95, accuracy: 1e-9)
+        // A curve of the user's own replaces it; with acceleration off it doesn't apply.
+        s.pointerCurve = [.init(5, 20), .init(15, 90), .init(30, 150)]
+        XCTAssertEqual(Pointer.override(s, mac: mac)?.scale, 1)
+        s.pointerCurve = nil
+        s.pointerAcceleration = false
+        XCTAssertEqual(Pointer.speed(at: 3, Pointer.override(s, mac: mac)!, curves: generic), 3 * 400 / 96, accuracy: 1e-9)
+        // Hand-edited values stay in range.
+        let decoded = try? JSONDecoder().decode(Settings.self, from: Data(#"{"pointerScale":40}"#.utf8))
+        XCTAssertEqual(decoded?.pointerScale, Pointer.scaleRange.upperBound)
+    }
+
     func testOnlyAppleMiceAreLeftForExternalOnly() {
         XCTAssertTrue(Pointer.isApple(vendor: 0x05AC))
         XCTAssertTrue(Pointer.isApple(vendor: 0x004C))
