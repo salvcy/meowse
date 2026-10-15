@@ -253,12 +253,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(viewItem(optionsRow))
 
-        displaySleepRow = ToggleRow("Allow Display to Sleep", symbol: "display", indented: true)
+        displaySleepRow = ToggleRow("Allow Display to Sleep", symbol: "display", accessory: .check, indented: true)
         displaySleepRow.onToggle = { [weak self] on in
             self?.store.settings.awakeAllowDisplaySleep = on  // AppDelegate updates a running session
             self?.refresh()
         }
-        lidRow = ToggleRow("Run With Lid Closed", symbol: "laptopcomputer", indented: true)
+        lidRow = ToggleRow("Run With Lid Closed", symbol: "laptopcomputer", accessory: .check, indented: true)
         lidRow.onToggle = { [weak self] on in
             self?.store.settings.awakeLidClosed = on  // AppDelegate asks for the helper's approval
             self?.refresh()
