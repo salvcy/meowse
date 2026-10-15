@@ -27,6 +27,8 @@ final class SettingsStore: ObservableObject {
     @Published private(set) var touchKind: TouchKind?
     /// Cached so view updates never query the login-item service.
     @Published private(set) var launchAtLogin = false
+    /// The Mac's pointer settings and the mouse's curves, read when Settings opens.
+    @Published var pointerInfo: PointerInfo?
 
     private var savePending = false
 

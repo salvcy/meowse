@@ -7,6 +7,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var enabled = true
     public var showMenuBarIcon = true
 
+    // Mouse pointer. Nil follows the Mac's own setting.
+    public var pointerAcceleration: Bool?
+    /// The acceleration value, as System Settings' Tracking speed sets it.
+    public var pointerSpeed: Double?
+
     // Smoothing
     public var smooth = true
     public var smoothVertical = true
@@ -23,6 +28,9 @@ public struct Settings: Codable, Equatable, Sendable {
     public var reverseVertical = true
     public var reverseHorizontal = true
 
+    /// Apps whose scrolling is left as it is.
+    public var excludedApps: [ExcludedApp] = []
+
     // Hold while scrolling
     public var fasterKey: Hotkey = .modifier(.option)
     /// Turns vertical wheel input into horizontal scrolling.
@@ -33,6 +41,10 @@ public struct Settings: Codable, Equatable, Sendable {
 
     /// A click stops a glide in flight.
     public var stopOnClick = true
+
+    // Mouse buttons
+    public var buttonShortcutsOn = true
+    public var buttonShortcuts: [ButtonShortcut] = []
 
     // Awake. Sessions aren't persisted; these preferences are.
     /// Keep the system awake but let the display sleep.
@@ -56,6 +68,8 @@ public struct Settings: Codable, Equatable, Sendable {
         }
         read(.enabled, &s.enabled)
         read(.showMenuBarIcon, &s.showMenuBarIcon)
+        read(.pointerAcceleration, &s.pointerAcceleration)
+        read(.pointerSpeed, &s.pointerSpeed)
         read(.smooth, &s.smooth)
         read(.smoothVertical, &s.smoothVertical)
         read(.smoothHorizontal, &s.smoothHorizontal)
@@ -64,11 +78,14 @@ public struct Settings: Codable, Equatable, Sendable {
         read(.trackpadPhases, &s.trackpadPhases)
         read(.reverseVertical, &s.reverseVertical)
         read(.reverseHorizontal, &s.reverseHorizontal)
+        read(.excludedApps, &s.excludedApps)
         read(.fasterKey, &s.fasterKey)
         read(.sidewaysKey, &s.sidewaysKey)
         read(.unsmoothedKey, &s.unsmoothedKey)
         read(.fasterFactor, &s.fasterFactor)
         read(.stopOnClick, &s.stopOnClick)
+        read(.buttonShortcutsOn, &s.buttonShortcutsOn)
+        read(.buttonShortcuts, &s.buttonShortcuts)
         read(.awakeAllowDisplaySleep, &s.awakeAllowDisplaySleep)
         read(.awakeLidClosed, &s.awakeLidClosed)
         read(.wiggleInterval, &s.wiggleInterval)
@@ -80,6 +97,12 @@ public struct Settings: Codable, Equatable, Sendable {
         s.glideTime = s.glideTime.clamped(to: Self.glideTimeRange)
         s.fasterFactor = s.fasterFactor.clamped(to: Self.fasterFactorRange)
         s.wiggleInterval = s.wiggleInterval.clamped(to: Awake.wiggleIntervals.min()!...Awake.wiggleIntervals.max()!)
+        s.pointerSpeed = s.pointerSpeed.map { $0.clamped(to: PointerCurves.accelerationRange) }
+        // One row per button or wheel direction.
+        var triggers = Set<MouseTrigger>()
+        s.buttonShortcuts = s.buttonShortcuts.filter { $0.trigger.isValid && triggers.insert($0.trigger).inserted }
+        var apps = Set<String>()
+        s.excludedApps = s.excludedApps.filter { apps.insert($0.bundleID).inserted }
         let defaults = Settings()
         if !s.fasterKey.isValid { s.fasterKey = defaults.fasterKey }
         if !s.sidewaysKey.isValid { s.sidewaysKey = defaults.sidewaysKey }

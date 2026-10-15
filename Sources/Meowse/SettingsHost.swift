@@ -148,6 +148,7 @@ final class SettingsHost {
         s.engine = store.engineStatus
         s.device = store.scrollDevice
         s.touch = store.touchKind
+        s.pointer = store.pointerInfo
         s.launchAtLogin = store.launchAtLogin
         s.awake = awake.isAwake
         s.awakeUntil = awake.awakeUntil

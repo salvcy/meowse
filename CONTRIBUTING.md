@@ -14,7 +14,8 @@ change that adds idle work or system-wide cost needs a very good reason.
    uses 0% CPU and has no idle wakeups. Check with `scripts/measure.sh`.
 3. **One active event tap.** Its mask is built from the current settings, and
    it doesn't exist when nothing needs it. Modifier hotkeys are read from event
-   flags, so the tap never receives keyboard events. Stop-on-click listens
+   flags, so the tap never receives keyboard events; button shortcuts only post
+   them, and buttons reach the tap only once one has a shortcut. Stop-on-click listens
    through a second, listen-only tap that's enabled only while a glide is in
    flight, so clicks never wait for Meowse.
 4. **Keep the event path lean.** Scroll handling and frame posting run on the
@@ -25,6 +26,9 @@ change that adds idle work or system-wide cost needs a very good reason.
    with a system-enforced timeout rather than tracking time itself, and freed
    memory goes back to the system through the allocator's space-efficient
    mode (`LSEnvironment` in `Resources/Info.plist`), not purging of our own.
+   Mouse acceleration is the value System Settings' Tracking speed sets, given
+   to each mouse (`PointerControl.swift`), so pointer movement never passes
+   through Meowse; the Mac's own value goes back when Meowse quits.
    The one thing a running app can't return is what macOS keeps in it after
    display changes (colour tables, window contexts, freed pages), so once
    Meowse has doubled its launch memory it starts over the next time the

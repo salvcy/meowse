@@ -2,7 +2,7 @@ import SwiftUI
 import MeowseCore
 
 
-private extension View {
+extension View {
     func settingsTab() -> some View {
         formStyle(.grouped)
             .frame(width: 480)
@@ -10,7 +10,7 @@ private extension View {
     }
 }
 
-private func caption(_ text: String) -> some View {
+func caption(_ text: String) -> some View {
     Text(text).font(.caption).foregroundStyle(.secondary)
 }
 
@@ -93,6 +93,7 @@ struct ScrollingTab: View {
         Form {
             Section {
                 Toggle("Enable scroll enhancements", isOn: $store.settings.enabled)
+                ExcludedApps(store: store)
             } footer: {
                 caption("Only scroll wheels are affected. Trackpads and the Magic Mouse are left alone.")
             }
@@ -134,35 +135,66 @@ struct ScrollingTab: View {
 
 struct HotkeysTab: View {
     @ObservedObject var store: SettingsStore
+    @StateObject private var capture = Capture()
 
-    private static let choices: [Hotkey] =
-        [.none] + ModifierKey.allCases.map { .modifier($0) } + [.mouseButton(2), .mouseButton(3), .mouseButton(4)]
+    private static let holdKeys: [(String, WritableKeyPath<MeowseCore.Settings, Hotkey>)] = [
+        ("Scroll faster", \.fasterKey),
+        ("Scroll sideways", \.sidewaysKey),
+        ("Scroll without smoothing", \.unsmoothedKey),
+    ]
 
     var body: some View {
         Form {
             Section {
-                picker("Scroll faster", $store.settings.fasterKey)
-                picker("Scroll sideways", $store.settings.sidewaysKey)
-                picker("Scroll without smoothing", $store.settings.unsmoothedKey)
+                ForEach(Self.holdKeys.indices, id: \.self) { i in
+                    holdKey(i)
+                }
                 SliderRow("Faster by", value: $store.settings.fasterFactor, range: Settings.fasterFactorRange, format: "%.1f×")
-            } header: {
-                Text("Hold while scrolling")
-            } footer: {
-                if let shared = sharedKey { caption(shared) }
-            }
-
-            Section {
                 Toggle("Stop glide on click", isOn: $store.settings.stopOnClick)
+            } header: {
+                Text("Scroll")
+            } footer: {
+                caption(sharedKey ?? "Hold these while scrolling. Click one, then press a modifier key or an extra mouse button. Right-click a modifier to use only its left or right key.")
+            }
+            .disabled(!store.settings.enabled)
+
+            MouseButtonsSection(store: store, capture: capture)
+        }
+        .settingsTab()
+        .onDisappear { capture.stop() }
+    }
+
+    private func holdKey(_ i: Int) -> some View {
+        let (title, path) = Self.holdKeys[i]
+        let key = store.settings[keyPath: path]
+        return LabeledContent(title) {
+            HStack(spacing: 6) {
+                RecorderField(label: key.fieldLabel, empty: "Set key", prompt: "Press a key…",
+                              recording: capture.target == .hotkey(i)) {
+                    capture.start(.hotkey(i)) { event in
+                        guard let hotkey = Recorded.hotkey(event) else { return .keep }
+                        store.settings[keyPath: path] = hotkey
+                        return .finish
+                    }
+                }
+                .contextMenu {
+                    if case .modifier(let m) = key {
+                        Button("Either Side") { store.settings[keyPath: path] = .modifier(m.either) }
+                        Button("Left Side Only") { store.settings[keyPath: path] = .modifier(m.left) }
+                        Button("Right Side Only") { store.settings[keyPath: path] = .modifier(m.right) }
+                    }
+                }
+                ClearButton(help: "No key") { store.settings[keyPath: path] = .none }
+                    .opacity(key == .none ? 0 : 1)
+                    .disabled(key == .none)
             }
         }
-        .disabled(!store.settings.enabled)
-        .settingsTab()
     }
 
     /// Holding a key that two actions use does both.
     private var sharedKey: String? {
         let s = store.settings
-        let keys = [("Scroll faster", s.fasterKey), ("Scroll sideways", s.sidewaysKey), ("Scroll without smoothing", s.unsmoothedKey)]
+        let keys = Self.holdKeys.map { ($0.0, s[keyPath: $0.1]) }
         for (i, a) in keys.enumerated() {
             for b in keys[(i + 1)...] where a.1.overlaps(b.1) {
                 return "\(a.0) and \(b.0.lowercased()) share a key, so holding it does both."
@@ -170,11 +202,93 @@ struct HotkeysTab: View {
         }
         return nil
     }
+}
 
-    private func picker(_ title: String, _ selection: Binding<Hotkey>) -> some View {
-        Picker(title, selection: selection) {
-            ForEach(Self.choices, id: \.self) { Text($0.displayName).tag($0) }
+/// Extra buttons and side-wheel directions that press key combinations.
+private struct MouseButtonsSection: View {
+    @ObservedObject var store: SettingsStore
+    @ObservedObject var capture: Capture
+
+    var body: some View {
+        Section {
+            Toggle(isOn: $store.settings.buttonShortcutsOn) {
+                Text("Use extra buttons as shortcuts")
+                Text("A button or side wheel with a shortcut presses its keys instead of doing what it normally does.")
+            }
+            Group {
+                ForEach(store.settings.buttonShortcuts, id: \.trigger) { shortcut in
+                    row(shortcut)
+                }
+                addRow
+            }
+            .disabled(!store.settings.buttonShortcutsOn)
+        } header: {
+            Text("Mouse buttons")
+        } footer: {
+            if let note { caption(note) }
         }
+    }
+
+    private func row(_ shortcut: ButtonShortcut) -> some View {
+        LabeledContent(shortcut.trigger.displayName) {
+            HStack(spacing: 6) {
+                RecorderField(label: shortcut.keys?.displayName, empty: "Set shortcut", prompt: "Type a shortcut…",
+                              recording: capture.target == .shortcut(shortcut.trigger)) {
+                    record(shortcut.trigger)
+                }
+                ClearButton(help: "Remove") {
+                    store.settings.buttonShortcuts.removeAll { $0.trigger == shortcut.trigger }
+                }
+            }
+        }
+    }
+
+    private var addRow: some View {
+        HStack {
+            if capture.target == .trigger {
+                Text("Press a mouse button or turn the side wheel over this window…")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Cancel") { capture.stop() }
+            } else {
+                Button {
+                    capture.start(.trigger) { event in
+                        let s = store.settings
+                        guard let trigger = Recorded.trigger(event, reversed: s.enabled && s.reverseHorizontal) else { return .keep }
+                        if !s.buttonShortcuts.contains(where: { $0.trigger == trigger }) {
+                            store.settings.buttonShortcuts.append(ButtonShortcut(trigger: trigger))
+                        }
+                        // Straight on to its shortcut.
+                        DispatchQueue.main.async { record(trigger) }
+                        return .finish
+                    }
+                } label: {
+                    Label("Add a Button or Side Wheel", systemImage: "plus")
+                }
+            }
+        }
+    }
+
+    private func record(_ trigger: MouseTrigger) {
+        capture.start(.shortcut(trigger)) { event in
+            guard let keys = Recorded.shortcut(event),
+                  let i = store.settings.buttonShortcuts.firstIndex(where: { $0.trigger == trigger }) else { return .keep }
+            store.settings.buttonShortcuts[i].keys = keys
+            return .finish
+        }
+    }
+
+    /// A button that's also held to scroll does both.
+    private var note: String? {
+        let s = store.settings
+        let holds: [(String, Hotkey)] = [("scroll faster", s.fasterKey), ("scroll sideways", s.sidewaysKey),
+                                         ("scroll without smoothing", s.unsmoothedKey)]
+        for shortcut in s.buttonShortcuts where shortcut.keys != nil {
+            guard case .button(let n) = shortcut.trigger,
+                  let hold = holds.first(where: { $0.1 == .mouseButton(n) }) else { continue }
+            return "\(shortcut.trigger.displayName) is also held to \(hold.0), so it does both."
+        }
+        return nil
     }
 }
 
@@ -312,6 +426,90 @@ struct UpdatesTab: View {
         case .failed(let message):
             Text(message).foregroundStyle(.orange).multilineTextAlignment(.trailing)
         }
+    }
+}
+
+// MARK: - Excluded apps
+
+/// Apps whose scrolling Meowse leaves alone.
+private struct ExcludedApps: View {
+    @ObservedObject var store: SettingsStore
+    @State private var open = false
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $open) {
+            ForEach(store.settings.excludedApps, id: \.bundleID) { app in
+                HStack(spacing: 8) {
+                    Image(nsImage: Self.icon(app)).resizable().frame(width: 18, height: 18)
+                    Text(app.name)
+                    Spacer()
+                    Button {
+                        store.settings.excludedApps.removeAll { $0.bundleID == app.bundleID }
+                    } label: {
+                        Image(systemName: "minus.circle.fill").foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Stop excluding \(app.name)")
+                    .accessibilityLabel("Remove \(app.name)")
+                }
+            }
+            HStack {
+                Button(action: choose) {
+                    Label("Add an App…", systemImage: "plus")
+                }
+                Spacer()
+            }
+            caption("Meowse doesn’t smooth, reverse or otherwise change the wheel in these apps. Handy for ones with wheel handling of their own, such as games and 3D tools.")
+        } label: {
+            HStack {
+                Text("Excluded apps")
+                Spacer()
+                if !store.settings.excludedApps.isEmpty {
+                    Text("\(store.settings.excludedApps.count)").foregroundStyle(.secondary).monospacedDigit()
+                }
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { withAnimation { open.toggle() } }
+        }
+    }
+
+    private func choose() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "Exclude"
+        panel.message = "Choose apps whose scrolling Meowse should leave alone."
+        let add = { (response: NSApplication.ModalResponse) in
+            guard response == .OK else { return }
+            for url in panel.urls {
+                guard let id = Bundle(url: url)?.bundleIdentifier,
+                      !store.settings.excludedApps.contains(where: { $0.bundleID == id }) else { continue }
+                let name = FileManager.default.displayName(atPath: url.path)
+                store.settings.excludedApps.append(ExcludedApp(
+                    bundleID: id,
+                    name: name.hasSuffix(".app") ? String(name.dropLast(4)) : name,
+                    path: url.path))
+            }
+        }
+        if let window = NSApp.keyWindow {
+            panel.beginSheetModal(for: window, completionHandler: add)
+        } else {
+            add(panel.runModal())
+        }
+    }
+
+    /// Looked up once per app, not on every redraw.
+    private static var icons: [String: NSImage] = [:]
+
+    private static func icon(_ app: ExcludedApp) -> NSImage {
+        if let icon = icons[app.bundleID] { return icon }
+        let path = FileManager.default.fileExists(atPath: app.path)
+            ? app.path
+            : NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID)?.path ?? app.path
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        icons[app.bundleID] = icon
+        return icon
     }
 }
 

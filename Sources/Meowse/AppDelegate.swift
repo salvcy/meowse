@@ -8,6 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let awake = AwakeController.shared
     private let updater = Updater.shared
     private let lid = LidHold()
+    private let pointer = PointerControl()
+    /// Where the excluded apps are, looked up when the list changes.
+    private var excludedPaths: [String] = []
+    private var engineConfig = EngineConfig(Settings())
     private lazy var statusMenu = StatusMenuController(store: store, awake: awake, updater: updater, lid: lid)
     private lazy var settingsHost: SettingsHost = {
         let host = SettingsHost(store: store, awake: awake, updater: updater)
@@ -28,8 +32,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // First, so a copy that's moving never installs its tap or asks for access.
         if AppMover.offerMove() { return }
         engine.start()
-        engine.apply(EngineConfig(store.settings))
+        excludedPaths = Self.paths(of: store.settings.excludedApps)
+        engineConfig = EngineConfig(store.settings, excludedPaths: excludedPaths)
+        engine.apply(engineConfig)
         rebuildScreens()
+        pointer.update(store.settings)
+        pointer.onDevicesChange = { [weak self] in self?.refreshPointerInfo() }
 
         store.onChange = { [weak self] new, old in self?.settingsChanged(new, old) }
         awake.onChange = { [weak self] in
@@ -74,8 +82,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func settingsChanged(_ new: Settings, _ old: Settings) {
-        let config = EngineConfig(new)
-        if config != EngineConfig(old) { engine.apply(config) }
+        if new.excludedApps != old.excludedApps { excludedPaths = Self.paths(of: new.excludedApps) }
+        let config = EngineConfig(new, excludedPaths: excludedPaths)
+        if config != engineConfig {
+            engineConfig = config
+            engine.apply(config)
+        }
+        if new.pointerAcceleration != old.pointerAcceleration || new.pointerSpeed != old.pointerSpeed {
+            pointer.update(new)
+            refreshPointerInfo()
+        }
         if new.showMenuBarIcon != old.showMenuBarIcon { statusMenu.setVisible(new.showMenuBarIcon) }
         if new.enabled != old.enabled { statusMenu.updateIcon() }
 
@@ -118,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 self?.refreshTrust(prompt: false)
                 self?.engine.revalidate()
+                self?.pointer.reapply()
             }
         }
 
@@ -244,12 +261,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showSettings(tab: SettingsTab? = nil) {
         store.refreshLaunchAtLogin()
         refreshTrust(prompt: false)
+        store.pointerInfo = pointer.info()
         settingsHost.show(tab: tab)
+    }
+
+    /// Only Settings shows it, so it's read only while Settings is open.
+    private func refreshPointerInfo() {
+        if settingsHost.isOpen { store.pointerInfo = pointer.info() }
+    }
+
+    /// Where each excluded app is now, and where it was when added, in case
+    /// there are two copies.
+    private static func paths(of apps: [ExcludedApp]) -> [String] {
+        var paths: [String] = []
+        for app in apps {
+            for url in [NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.bundleID), URL(fileURLWithPath: app.path)] {
+                if let path = url?.resolvingSymlinksInPath().path, !paths.contains(path) { paths.append(path) }
+            }
+        }
+        return paths
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         store.flush()
         awake.stopAwake()
         lid.update(wanted: false)
+        pointer.restore()
     }
 }

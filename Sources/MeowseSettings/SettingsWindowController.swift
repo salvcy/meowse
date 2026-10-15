@@ -22,6 +22,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             tabs.addTabViewItem(item)
         }
         add("General", "gearshape", GeneralTab(store: store, requestPermission: requestPermission))
+        add("Mouse", "computermouse", MouseTab(store: store))
         add("Scrolling", "scroll", ScrollingTab(store: store))
         add("Hotkeys", "keyboard", HotkeysTab(store: store))
         add("Awake", "cup.and.saucer", AwakeTab(store: store, awake: awake))

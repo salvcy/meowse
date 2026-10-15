@@ -21,7 +21,7 @@ public enum UpdateStatus: Codable, Equatable, Sendable {
 }
 
 public enum SettingsTab: Int, Codable, Sendable {
-    case general, scrolling, hotkeys, awake, updates
+    case general, mouse, scrolling, hotkeys, awake, updates
 }
 
 /// Everything the Settings window shows.
@@ -33,6 +33,8 @@ public struct SettingsState: Codable, Equatable, Sendable {
     public var engine = EngineStatus.off
     public var device: ScrollDevice?
     public var touch: TouchKind?
+    /// The Mac's own pointer settings and the connected mouse's curves.
+    public var pointer: PointerInfo?
     public var launchAtLogin = false
     public var awake = false
     /// When a timed Keep Awake session ends; nil for one that runs until turned off.

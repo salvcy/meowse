@@ -57,6 +57,12 @@ final class Engine: NSObject {
     /// system's copies of them carry the coasting trackpad's.
     private var glideSender: Int64 = 0
     private var heldButtons: UInt32 = 0
+    /// Buttons whose press became a shortcut, so their release is swallowed too.
+    private var shortcutButtons: UInt32 = 0
+    /// When a side wheel last ticked toward a shortcut, and which way.
+    private var wheelTickTime = 0.0
+    private var wheelTickLeft = false
+    private var keySource: CGEventSource?
     private var targets = TargetCache()
     private var screens: [ScreenLink] = []
     private var activeScreen = -1
@@ -99,6 +105,7 @@ final class Engine: NSObject {
         perform { [self] in
             // A change in feel ends the glide under the settings it started with.
             if newConfig.trackpadPhases != config.trackpadPhases || !newConfig.smooth { endGlide() }
+            if newConfig.excludedPaths != config.excludedPaths { targets.setExcluded(newConfig.excludedPaths) }
             config = newConfig
             animator.decay = newConfig.decay
             syncTap()
@@ -230,6 +237,7 @@ final class Engine: NSObject {
     private func removeTap() {
         endGlide()
         heldButtons = 0
+        shortcutButtons = 0
         if let tap {
             CGEvent.tapEnable(tap: tap, enable: false)
             // Otherwise the window server keeps the disabled tap until the process exits.
@@ -254,18 +262,52 @@ final class Engine: NSObject {
             return onScroll(event)
         case .otherMouseDown:
             let n = event.getIntegerValueField(.mouseEventButtonNumber)
-            if n >= 0 && n < 32 { heldButtons |= 1 << UInt32(n) }
+            guard n >= 0 && n < 32 else { break }
+            heldButtons |= 1 << UInt32(n)
+            if let keys = config.buttonKeys[Int(n)] {
+                shortcutButtons |= 1 << UInt32(n)
+                press(keys)
+                return nil
+            }
         case .otherMouseUp:
             let n = event.getIntegerValueField(.mouseEventButtonNumber)
-            if n >= 0 && n < 32 { heldButtons &= ~(1 << UInt32(n)) }
+            guard n >= 0 && n < 32 else { break }
+            heldButtons &= ~(1 << UInt32(n))
+            if shortcutButtons & (1 << UInt32(n)) != 0 {
+                shortcutButtons &= ~(1 << UInt32(n))
+                return nil
+            }
         case .tapDisabledByTimeout, .tapDisabledByUserInput:
             heldButtons = 0
+            shortcutButtons = 0
             endGlide()
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
         default:
             break
         }
         return Unmanaged.passUnretained(event)
+    }
+
+    // MARK: - Shortcuts
+
+    /// Presses and releases a key combination, as a keyboard would.
+    private func press(_ keys: KeyCombo) {
+        if keySource == nil { keySource = CGEventSource(stateID: .privateState) }
+        let flags = CGEventFlags(rawValue: keys.modifiers)
+        for down in [true, false] {
+            guard let e = CGEvent(keyboardEventSource: keySource, virtualKey: keys.keyCode, keyDown: down) else { return }
+            e.flags = flags
+            e.post(tap: .cghidEventTap)
+        }
+    }
+
+    /// One press per turn of the wheel: ticks that follow within a moment,
+    /// the same way, belong to the same turn.
+    private func wheelTicked(_ keys: KeyCombo, left: Bool) {
+        let now = CACurrentMediaTime()
+        if left != wheelTickLeft || now - wheelTickTime > 0.3 { press(keys) }
+        wheelTickTime = now
+        wheelTickLeft = left
     }
 
     /// A click stops the glide in flight.
@@ -309,7 +351,20 @@ final class Engine: NSObject {
             if dy == 0 && dx == 0 { return Unmanaged.passUnretained(event) }
         }
 
+        // A side wheel with a shortcut presses it instead of scrolling.
+        if dy == 0 && (config.wheelLeftKeys != nil || config.wheelRightKeys != nil) {
+            let left = SideWheel.turnedLeft(delta: dx, inverted: event.getIntegerValueField(SideWheel.invertedField) != 0)
+            if let keys = config.wheelKeys(left: left) {
+                wheelTicked(keys, left: left)
+                return nil
+            }
+        }
+
         let pid = pid_t(truncatingIfNeeded: event.getIntegerValueField(.eventTargetUnixProcessID))
+        if !config.excludedPaths.isEmpty && targets.isExcluded(pid) {
+            if animator.isActive && pid != targetPID { endGlide() }
+            return Unmanaged.passUnretained(event)
+        }
         // Bypass is immediate: the glide in flight ends before this tick passes through.
         if animator.isActive && config.unsmoothedKey.isHeld(flags: event.flags.rawValue, heldButtons: heldButtons) {
             endGlide()

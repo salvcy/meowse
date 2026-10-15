@@ -57,6 +57,7 @@ final class Remote {
         update(&store.engineStatus, s.engine)
         update(&store.scrollDevice, s.device)
         update(&store.touchKind, s.touch)
+        update(&store.pointer, s.pointer)
         update(&store.launchAtLogin, s.launchAtLogin)
         update(&awake.isAwake, s.awake)
         update(&awake.awakeUntil, s.awakeUntil)
@@ -86,6 +87,7 @@ final class SettingsStore: ObservableObject {
     @Published fileprivate(set) var scrollDevice: ScrollDevice?
     @Published fileprivate(set) var touchKind: TouchKind?
     @Published fileprivate(set) var launchAtLogin = false
+    @Published fileprivate(set) var pointer: PointerInfo?
     /// Set while Meowse's settings are applied, so they aren't sent back.
     fileprivate var applying = false
 
