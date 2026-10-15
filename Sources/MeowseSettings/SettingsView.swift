@@ -458,9 +458,9 @@ struct UpdatesTab: View {
 
 /// Apps whose scrolling Meowse leaves alone: a row that opens a list.
 ///
-/// Opening it changes the window's height. The rows appear in one step,
-/// without animation: an animated expansion would run against the window's
-/// resize and flicker the scroll bar.
+/// Opening it changes the window's height (see `SettingsWindowController`).
+/// The rows appear without animation: the window's resize animates instead,
+/// and two animations at once would flicker the scroll bar.
 private struct ExcludedApps: View {
     @ObservedObject var store: SettingsStore
     @State private var open = false

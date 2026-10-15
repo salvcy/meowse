@@ -3,10 +3,17 @@ import SwiftUI
 import MeowseCore
 
 /// Settings window with toolbar tabs. The process exits when it closes.
+///
+/// The window is always as tall as the selected tab's content, and only
+/// `TabsController` changes its size: each tab reports its height, and the
+/// window follows with AppKit's animated resize, which draws every step. The
+/// content is pinned to the top, so nothing above a change moves. (Left to
+/// NSTabViewController and SwiftUI, the size changed partway through drawing
+/// a frame, and the screen showed a mismatched layout until the next one.)
 final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     var onClose: (() -> Void)?
-    private let tabs = FittingTabViewController()
+    private let tabs = TabsController()
 
     init(store: SettingsStore, awake: AwakeController, updater: Updater, requestPermission: @escaping () -> Void) {
         let tabs = self.tabs
@@ -14,16 +21,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
         func add<V: View>(_ title: String, _ symbol: String, _ view: V) {
             let host = NSHostingController(rootView: AnyView(EmptyView()))
-            // The window follows the tab's size through preferredContentSize.
-            // SwiftUI would update it midway through drawing a frame, and the
-            // window resized then kept showing the old layout until something
-            // next woke the app: seconds of blank space after a list opened.
-            // Set it just after the frame instead.
-            host.rootView = AnyView(view.onGeometryChange(for: CGSize.self) { $0.size } action: { [weak host] size in
-                DispatchQueue.main.async { host?.preferredContentSize = size }
-            })
+            host.rootView = AnyView(view
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { [weak tabs, weak host] _ in
+                    // Reported while a frame is drawn; the window follows after it.
+                    DispatchQueue.main.async {
+                        if let tabs, let host { tabs.contentChanged(in: host) }
+                    }
+                }
+                .frame(maxHeight: .infinity, alignment: .top))
+            // No preferredContentSize: AppKit would size the window from it too.
             host.sizingOptions = []
-            host.preferredContentSize = host.sizeThatFits(in: NSSize(width: 480, height: 10_000))
+            // The toolbar sits above the content, not over it; measured with the
+            // title bar's safe area, a tab came out 28 pt taller than it lays out.
+            host.safeAreaRegions = []
             host.title = title  // becomes the window title
             let item = NSTabViewItem(viewController: host)
             item.label = title
@@ -43,6 +53,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+        tabs.fitWindow()
     }
 
     @available(*, unavailable)
@@ -50,6 +61,8 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func select(_ tab: SettingsTab) {
         tabs.selectedTabViewItemIndex = tab.rawValue
+        // Before the window first shows, the tab view doesn't report the switch yet.
+        tabs.fitWindow()
     }
 
     func show() {
@@ -63,29 +76,29 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-/// Resizes the window to the selected tab's SwiftUI content, anchored at
-/// the top. Within a tab, the window follows the content through its
-/// preferredContentSize (see `SettingsWindowController.init`).
-private final class FittingTabViewController: NSTabViewController {
+/// Toolbar tabs whose window is as tall as the selected tab's content,
+/// anchored at the top.
+private final class TabsController: NSTabViewController {
+
+    /// A tab's content changed height (a list opened, a row appeared).
+    func contentChanged(in host: NSViewController) {
+        if host === tabViewItems[selectedTabViewItemIndex].viewController { fitWindow() }
+    }
 
     override func tabView(_ tabView: NSTabView, didSelect item: NSTabViewItem?) {
         super.tabView(tabView, didSelect: item)
         fitWindow()
     }
 
-    /// A tab that was hidden may have changed size since it was last shown.
-    override func tabView(_ tabView: NSTabView, willSelect item: NSTabViewItem?) {
-        if let host = item?.viewController as? NSHostingController<AnyView> {
-            host.preferredContentSize = host.sizeThatFits(in: NSSize(width: 480, height: 10_000))
-        }
-        super.tabView(tabView, willSelect: item)
-    }
-
-    private func fitWindow() {
+    /// Measured, not taken from the change report: the first layout after
+    /// the window appears reports the content 28 pt taller than it settles.
+    func fitWindow() {
         guard let window = view.window,
-              let size = tabViewItems[selectedTabViewItemIndex].viewController?.preferredContentSize,
-              size.width > 0, size.height > 0 else { return }
-        let target = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+              let host = tabViewItems[selectedTabViewItemIndex].viewController as? NSHostingController<AnyView> else { return }
+        // With no height on offer, the content pinned to the top reports its own.
+        let height = host.sizeThatFits(in: NSSize(width: 480, height: 0)).height
+        let target = window.frameRect(forContentRect: NSRect(x: 0, y: 0, width: 480, height: height))
+        guard abs(target.height - window.frame.height) > 0.5 || abs(target.width - window.frame.width) > 0.5 else { return }
         var frame = window.frame
         frame.origin.y += frame.height - target.height
         frame.size = target.size
