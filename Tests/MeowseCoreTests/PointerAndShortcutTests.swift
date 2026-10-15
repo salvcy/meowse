@@ -10,12 +10,12 @@ final class PointerTests: XCTestCase {
     /// read from the registry on macOS 27).
     private let parametric = PointerCurves(parametric: [
         .init(index: 0, gainLinear: 1, tangentLinear: 8),
-        .init(index: 0.125, gainLinear: 60293 / 65536, gainParabolic: 26214 / 65536, gainCubic: 5243 / 65536,
-              tangentLinear: 537395 / 65536, tangentRoot: 1245184 / 65536),
-        .init(index: 1, gainLinear: 62915 / 65536, gainParabolic: 69468 / 65536, gainCubic: 11796 / 65536,
-              tangentLinear: 563610 / 65536, tangentRoot: 983040 / 65536),
-        .init(index: 1.5, gainLinear: 63570 / 65536, gainParabolic: 81920 / 65536, gainCubic: 14418 / 65536,
-              tangentLinear: 570163 / 65536, tangentRoot: 917504 / 65536),
+        .init(index: 0.125, gainLinear: 60293 / 65536.0, gainParabolic: 26214 / 65536.0, gainCubic: 5243 / 65536.0,
+              tangentLinear: 537395 / 65536.0, tangentRoot: 1245184 / 65536.0),
+        .init(index: 1, gainLinear: 62915 / 65536.0, gainParabolic: 69468 / 65536.0, gainCubic: 11796 / 65536.0,
+              tangentLinear: 563610 / 65536.0, tangentRoot: 983040 / 65536.0),
+        .init(index: 1.5, gainLinear: 63570 / 65536.0, gainParabolic: 81920 / 65536.0, gainCubic: 14418 / 65536.0,
+              tangentLinear: 570163 / 65536.0, tangentRoot: 917504 / 65536.0),
     ])
 
     func testBuiltInTableMatchesWhatTheSystemUses() {
