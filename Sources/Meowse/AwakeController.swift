@@ -25,13 +25,37 @@ final class AwakeController: ObservableObject {
 
     // MARK: - Keep Awake
 
+    /// How a session was started, for the menu to show which pill is on.
+    enum Session: Equatable {
+        case indefinite
+        case length(TimeInterval)
+        case until(Date)
+    }
+
     private var assertion: IOPMAssertionID = 0
     private var expiryTimer: DispatchSourceTimer?
-    /// nil while awake means until turned off.
+    private(set) var session: Session?
+    /// When a timed session ends; nil while off or until turned off.
     private(set) var awakeUntil: Date?
     var isAwake: Bool { assertion != 0 }
 
+    /// A `duration` of 0 runs until turned off.
     func startAwake(duration: TimeInterval, allowDisplaySleep: Bool) {
+        start(duration > 0 ? .length(duration) : .indefinite,
+              until: duration > 0 ? Date(timeIntervalSinceNow: duration) : nil, allowDisplaySleep: allowDisplaySleep)
+    }
+
+    func startAwake(until end: Date, allowDisplaySleep: Bool) {
+        start(.until(end), until: end, allowDisplaySleep: allowDisplaySleep)
+    }
+
+    /// Keeps a running session, with or without the display.
+    func setAllowDisplaySleep(_ allow: Bool) {
+        guard isAwake, let session else { return }
+        start(session, until: awakeUntil, allowDisplaySleep: allow)
+    }
+
+    private func start(_ session: Session, until end: Date?, allowDisplaySleep: Bool) {
         releaseAssertion()
         let type = allowDisplaySleep ? kIOPMAssertPreventUserIdleSystemSleep : kIOPMAssertPreventUserIdleDisplaySleep
         var props: [String: Any] = [
@@ -39,7 +63,8 @@ final class AwakeController: ObservableObject {
             kIOPMAssertionNameKey: "Meowse: Keep Awake",
             kIOPMAssertionLevelKey: kIOPMAssertionLevelOn,
         ]
-        if duration > 0 {
+        let duration = end.map { max(1, $0.timeIntervalSinceNow) }
+        if let duration {
             props[kIOPMAssertionTimeoutKey] = duration
             props[kIOPMAssertionTimeoutActionKey] = kIOPMAssertionTimeoutActionRelease
         }
@@ -50,8 +75,9 @@ final class AwakeController: ObservableObject {
             return
         }
         assertion = id
-        if duration > 0 {
-            awakeUntil = Date(timeIntervalSinceNow: duration)
+        self.session = session
+        if let end, let duration {
+            awakeUntil = end
             let t = DispatchSource.makeTimerSource(queue: .main)
             // Wall-clock time keeps counting while the Mac sleeps; uptime would end the session late.
             t.schedule(wallDeadline: .now() + duration, repeating: .never, leeway: .seconds(2))
@@ -75,6 +101,7 @@ final class AwakeController: ObservableObject {
         expiryTimer?.cancel()
         expiryTimer = nil
         awakeUntil = nil
+        session = nil
         if assertion != 0 {
             // May already have been released by the timeout.
             IOPMAssertionRelease(assertion)

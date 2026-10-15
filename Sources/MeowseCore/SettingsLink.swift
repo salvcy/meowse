@@ -35,6 +35,8 @@ public struct SettingsState: Codable, Equatable, Sendable {
     public var touch: TouchKind?
     public var launchAtLogin = false
     public var awake = false
+    /// When a timed Keep Awake session ends; nil for one that runs until turned off.
+    public var awakeUntil: Date?
     public var wiggling = false
     public var version = ""
     public var update = UpdateStatus.idle
@@ -63,6 +65,8 @@ public enum SettingsAction: Codable, Equatable, Sendable {
     case wiggle(Bool)
     case checkForUpdates
     case installUpdate
+    /// Login Items in System Settings, where the lid helper is allowed.
+    case openLoginItems
 }
 
 public enum SettingsLink {

@@ -59,6 +59,7 @@ final class Remote {
         update(&store.touchKind, s.touch)
         update(&store.launchAtLogin, s.launchAtLogin)
         update(&awake.isAwake, s.awake)
+        update(&awake.awakeUntil, s.awakeUntil)
         update(&awake.isWiggling, s.wiggling)
         update(&updater.currentVersion, s.version)
         update(&updater.state, s.update)
@@ -92,10 +93,15 @@ final class SettingsStore: ObservableObject {
         launchAtLogin = on
         Connection.shared.send(.launchAtLogin(on))
     }
+
+    func openLoginItems() {
+        Connection.shared.send(.openLoginItems)
+    }
 }
 
 final class AwakeController: ObservableObject {
     @Published fileprivate(set) var isAwake = false
+    @Published fileprivate(set) var awakeUntil: Date?
     @Published fileprivate(set) var isWiggling = false
 
     // Meowse starts sessions with the duration and interval in its settings,

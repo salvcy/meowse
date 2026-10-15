@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "Meowse", targets: ["Meowse"]),
         .executable(name: "MeowseSettings", targets: ["MeowseSettings"]),
+        .executable(name: "MeowseLid", targets: ["MeowseLid"]),
     ],
     targets: [
         .target(name: "MeowseCore"),
@@ -19,6 +20,13 @@ let package = Package(
             name: "MeowseSettings",
             dependencies: ["MeowseCore"],
             // Not on any hot path, so it's built for size: a smaller download.
+            swiftSettings: [.unsafeFlags(["-Osize"], .when(configuration: .release))]
+        ),
+        // The lid helper, a root daemon that stops lid-close sleep while Meowse
+        // holds it. It runs only while needed.
+        .executableTarget(
+            name: "MeowseLid",
+            dependencies: ["MeowseCore"],
             swiftSettings: [.unsafeFlags(["-Osize"], .when(configuration: .release))]
         ),
         .testTarget(

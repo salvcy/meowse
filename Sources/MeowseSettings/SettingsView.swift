@@ -19,6 +19,7 @@ private func caption(_ text: String) -> some View {
 struct GeneralTab: View {
     @ObservedObject var store: SettingsStore
     let requestPermission: () -> Void
+    @State private var confirmingRestore = false
 
     var body: some View {
         Form {
@@ -38,7 +39,8 @@ struct GeneralTab: View {
                     case .failed:
                         Label("Couldn’t start", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     case .off:
-                        Text(store.accessibilityTrusted ? "Off (nothing enabled)" : "Waiting for access")
+                        Text(ScrollingPause(trusted: store.accessibilityTrusted, enabled: store.settings.enabled,
+                                            engine: .off, device: nil, touch: nil)?.label ?? "Off (nothing enabled)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -65,11 +67,16 @@ struct GeneralTab: View {
                     Text("Meowse \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Button("Restore Defaults") {
+                    Button("Restore Defaults…") { confirmingRestore = true }
+                }
+                .confirmationDialog("Restore default settings?", isPresented: $confirmingRestore) {
+                    Button("Restore Defaults", role: .destructive) {
                         let keepIcon = store.settings.showMenuBarIcon
                         store.settings = Settings()
                         store.settings.showMenuBarIcon = keepIcon
                     }
+                } message: {
+                    Text("Everything except Launch at login and Show in menu bar goes back to how Meowse came.")
                 }
             }
         }
@@ -109,6 +116,15 @@ struct ScrollingTab: View {
                 Toggle("Reverse horizontal", isOn: $store.settings.reverseHorizontal)
             }
             .disabled(!store.settings.enabled)
+
+            Section {
+                LabeledContent {
+                    ScrollPreview()
+                } label: {
+                    Text("Try it")
+                    Text("Scroll here with your mouse wheel.")
+                }
+            }
         }
         .settingsTab()
     }
@@ -131,6 +147,8 @@ struct HotkeysTab: View {
                 SliderRow("Faster by", value: $store.settings.fasterFactor, range: Settings.fasterFactorRange, format: "%.1f×")
             } header: {
                 Text("Hold while scrolling")
+            } footer: {
+                if let shared = sharedKey { caption(shared) }
             }
 
             Section {
@@ -139,6 +157,18 @@ struct HotkeysTab: View {
         }
         .disabled(!store.settings.enabled)
         .settingsTab()
+    }
+
+    /// Holding a key that two actions use does both.
+    private var sharedKey: String? {
+        let s = store.settings
+        let keys = [("Scroll faster", s.fasterKey), ("Scroll sideways", s.sidewaysKey), ("Scroll without smoothing", s.unsmoothedKey)]
+        for (i, a) in keys.enumerated() {
+            for b in keys[(i + 1)...] where a.1.overlaps(b.1) {
+                return "\(a.0) and \(b.0.lowercased()) share a key, so holding it does both."
+            }
+        }
+        return nil
     }
 
     private func picker(_ title: String, _ selection: Binding<Hotkey>) -> some View {
@@ -157,20 +187,33 @@ struct AwakeTab: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Keep awake now", isOn: Binding(
+                Toggle(isOn: Binding(
                     get: { awake.isAwake },
-                    set: { $0 ? awake.startAwake(duration: store.settings.awakeDuration,
-                                                 allowDisplaySleep: store.settings.awakeAllowDisplaySleep)
+                    set: { $0 ? awake.startAwake(duration: 0, allowDisplaySleep: store.settings.awakeAllowDisplaySleep)
                               : awake.stopAwake() }
-                ))
-                Picker("Duration", selection: $store.settings.awakeDuration) {
-                    ForEach(Awake.durations, id: \.self) { Text(Awake.durationLabel($0)).tag($0) }
+                )) {
+                    Text("Keep awake now")
+                    if awake.isAwake {
+                        Text(awake.awakeUntil.map { "Until \($0.formatted(date: .omitted, time: .shortened))" } ?? "Until turned off")
+                    }
                 }
                 Toggle("Allow display to sleep", isOn: $store.settings.awakeAllowDisplaySleep)
+                Toggle(isOn: $store.settings.awakeLidClosed) {
+                    Text("Run with the lid closed")
+                    Text("macOS asks an administrator to allow this once, in Login Items.")
+                }
+                if store.settings.awakeLidClosed {
+                    LabeledContent {
+                        Button("Open Login Items…") { store.openLoginItems() }
+                    } label: {
+                        Text("Allow Meowse in the background")
+                        Text("If the window macOS opened was closed, it’s here.")
+                    }
+                }
             } header: {
                 Text("Keep Awake")
             } footer: {
-                caption("Timed sessions end on schedule even if Meowse quits. Closing the lid still puts the Mac to sleep.")
+                caption("Set a time from the menu bar. Timed sessions end on schedule even if Meowse quits. With the lid closed, the Mac sleeps anyway if its battery falls to \(Lid.lowBattery)%.")
             }
 
             Section {
@@ -292,6 +335,38 @@ private struct EngineActivity: View {
         .animation(.smooth, value: title)
         .help(idle ? "Trackpads and the Magic Mouse scroll smoothly on their own. Meowse takes over when you scroll a mouse wheel."
                    : "Smooths mouse wheel scrolling.")
+    }
+}
+
+/// A numbered page to scroll, so distance and smoothness can be felt while
+/// they're set. Meowse smooths this window like any other.
+private struct ScrollPreview: View {
+    /// Line lengths of a page of text: long lines, and a short one ending each paragraph.
+    private static let lengths: [CGFloat] = [0.94, 0.88, 0.97, 0.9, 0.52, 0.96, 0.85, 0.92, 0.38, 0.9, 0.98, 0.83, 0.95, 0.61]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(0..<150, id: \.self) { i in
+                    HStack(spacing: 12) {
+                        Text("\(i + 1)")
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.tertiary)
+                            .frame(width: 22, alignment: .trailing)
+                        Capsule()
+                            .fill(.quaternary)
+                            .frame(width: 170 * Self.lengths[i % Self.lengths.count], height: 5)
+                    }
+                }
+            }
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.never)
+        .frame(width: 220, height: 96)
+        .background(.background.opacity(0.6), in: .rect(cornerRadius: 6))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("A page to scroll")
     }
 }
 

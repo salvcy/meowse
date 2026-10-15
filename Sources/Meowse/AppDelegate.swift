@@ -7,10 +7,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let engine = Engine.shared
     private let awake = AwakeController.shared
     private let updater = Updater.shared
-    private lazy var statusMenu = StatusMenuController(store: store, awake: awake, updater: updater)
+    private let lid = LidHold()
+    private lazy var statusMenu = StatusMenuController(store: store, awake: awake, updater: updater, lid: lid)
     private lazy var settingsHost: SettingsHost = {
         let host = SettingsHost(store: store, awake: awake, updater: updater)
         host.requestPermission = { [weak self] in self?.requestPermission() }
+        host.openLoginItems = { [weak self] in self?.lid.openApproval() }
         return host
     }()
     private var trusted = false
@@ -30,11 +32,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         rebuildScreens()
 
         store.onChange = { [weak self] new, old in self?.settingsChanged(new, old) }
-        awake.onChange = { [weak self] in self?.statusMenu.updateIcon() }
+        awake.onChange = { [weak self] in
+            self?.statusMenu.updateIcon()
+            self?.updateLid()
+        }
+        lid.onChange = { [weak self] in self?.statusMenu.lidChanged() }
         statusMenu.openSettings = { [weak self] in self?.showSettings() }
         statusMenu.openUpdates = { [weak self] in self?.showSettings(tab: .updates) }
         statusMenu.requestPermission = { [weak self] in self?.requestPermission() }
-        statusMenu.willOpen = { [weak self] in self?.refreshTrust(prompt: false) }
+        statusMenu.willOpen = { [weak self] in
+            self?.refreshTrust(prompt: false)
+            self?.updateLid()  // e.g. the helper was approved since
+        }
         statusMenu.retryEngine = { [weak self] in self?.engine.revalidate() }
         engine.onStatusChange = { [weak self] status in
             self?.store.engineStatus = status
@@ -51,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         awake.observeSystem()
         updater.setAutomaticChecks(store.settings.checkForUpdates)
         refreshTrust(prompt: true)
+        welcomeOnFirstLaunch()
         // One-shot: what later growth is measured against.
         DispatchQueue.main.asyncAfter(deadline: .now() + 10) { [weak self] in
             self?.launchFootprint = Self.footprint()
@@ -70,9 +80,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if new.enabled != old.enabled { statusMenu.updateIcon() }
 
         // Running sessions pick up preference changes.
-        if new.awakeAllowDisplaySleep != old.awakeAllowDisplaySleep, awake.isAwake {
-            let remaining = awake.awakeUntil == nil ? 0 : max(1, awake.awakeRemaining ?? 0)
-            awake.startAwake(duration: remaining, allowDisplaySleep: new.awakeAllowDisplaySleep)
+        if new.awakeAllowDisplaySleep != old.awakeAllowDisplaySleep {
+            awake.setAllowDisplaySleep(new.awakeAllowDisplaySleep)
+        }
+        if new.awakeLidClosed != old.awakeLidClosed {
+            // Turned on by hand: ask for the helper's approval now, not when Keep Awake next starts.
+            if new.awakeLidClosed { lid.prepare() }
+            updateLid()
         }
         if new.wiggleInterval != old.wiggleInterval, awake.isWiggling {
             awake.startWiggle(interval: new.wiggleInterval)
@@ -80,6 +94,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if new.checkForUpdates != old.checkForUpdates {
             updater.setAutomaticChecks(new.checkForUpdates)
         }
+    }
+
+    /// Holds the lid open for sleep only while Keep Awake runs with that option on.
+    private func updateLid() {
+        lid.update(wanted: awake.isAwake && store.settings.awakeLidClosed)
     }
 
     // MARK: - System events
@@ -213,6 +232,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Settings window
 
+    /// A menu bar app shows nothing when it opens, so the first time, Settings
+    /// opens on General, where Accessibility turning on can be watched.
+    private func welcomeOnFirstLaunch() {
+        let key = "welcomed"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+        if !trusted { showSettings(tab: .general) }
+    }
+
     private func showSettings(tab: SettingsTab? = nil) {
         store.refreshLaunchAtLogin()
         refreshTrust(prompt: false)
@@ -222,5 +250,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         store.flush()
         awake.stopAwake()
+        lid.update(wanted: false)
     }
 }

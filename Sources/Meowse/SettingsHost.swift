@@ -12,6 +12,7 @@ final class SettingsHost {
     private let awake: AwakeController
     private let updater: Updater
     var requestPermission: () -> Void = {}
+    var openLoginItems: () -> Void = {}
 
     private var process: Process?
     private var toWindow: FileHandle?
@@ -116,7 +117,7 @@ final class SettingsHost {
         case .keepAwake(let on):
             shown?.awake = on  // the window shows these at once too
             if on {
-                awake.startAwake(duration: store.settings.awakeDuration, allowDisplaySleep: store.settings.awakeAllowDisplaySleep)
+                awake.startAwake(duration: 0, allowDisplaySleep: store.settings.awakeAllowDisplaySleep)
             } else {
                 awake.stopAwake()
             }
@@ -127,6 +128,8 @@ final class SettingsHost {
             updater.check(userInitiated: true)
         case .installUpdate:
             updater.install()
+        case .openLoginItems:
+            openLoginItems()
         }
     }
 
@@ -147,6 +150,7 @@ final class SettingsHost {
         s.touch = store.touchKind
         s.launchAtLogin = store.launchAtLogin
         s.awake = awake.isAwake
+        s.awakeUntil = awake.awakeUntil
         s.wiggling = awake.isWiggling
         s.version = updater.currentVersion.description
         s.update = updater.state

@@ -35,10 +35,11 @@ public struct Settings: Codable, Equatable, Sendable {
     public var stopOnClick = true
 
     // Awake. Sessions aren't persisted; these preferences are.
-    /// Keep-awake session length in seconds; 0 means until turned off.
-    public var awakeDuration: TimeInterval = 0
     /// Keep the system awake but let the display sleep.
     public var awakeAllowDisplaySleep = false
+    /// While Keep Awake is on, closing the lid doesn't sleep the Mac. Uses a
+    /// helper an administrator approves once (see `Lid`).
+    public var awakeLidClosed = false
     /// Wiggle the cursor after this many idle seconds.
     public var wiggleInterval: TimeInterval = 60
 
@@ -68,8 +69,8 @@ public struct Settings: Codable, Equatable, Sendable {
         read(.unsmoothedKey, &s.unsmoothedKey)
         read(.fasterFactor, &s.fasterFactor)
         read(.stopOnClick, &s.stopOnClick)
-        read(.awakeDuration, &s.awakeDuration)
         read(.awakeAllowDisplaySleep, &s.awakeAllowDisplaySleep)
+        read(.awakeLidClosed, &s.awakeLidClosed)
         read(.wiggleInterval, &s.wiggleInterval)
         read(.checkForUpdates, &s.checkForUpdates)
 
@@ -78,7 +79,6 @@ public struct Settings: Codable, Equatable, Sendable {
         s.notchDistance = s.notchDistance.clamped(to: Self.notchDistanceRange)
         s.glideTime = s.glideTime.clamped(to: Self.glideTimeRange)
         s.fasterFactor = s.fasterFactor.clamped(to: Self.fasterFactorRange)
-        s.awakeDuration = s.awakeDuration.clamped(to: 0...Awake.durations.max()!)
         s.wiggleInterval = s.wiggleInterval.clamped(to: Awake.wiggleIntervals.min()!...Awake.wiggleIntervals.max()!)
         let defaults = Settings()
         if !s.fasterKey.isValid { s.fasterKey = defaults.fasterKey }

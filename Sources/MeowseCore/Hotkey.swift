@@ -14,6 +14,15 @@ public enum Hotkey: Codable, Hashable, Sendable {
         return true
     }
 
+    /// Holding one can also count as holding the other, so both act at once.
+    public func overlaps(_ other: Hotkey) -> Bool {
+        switch (self, other) {
+        case (.modifier(let a), .modifier(let b)): return a.overlaps(b)
+        case (.mouseButton(let a), .mouseButton(let b)): return a == b
+        default: return false
+        }
+    }
+
     public var needsMouseButtonEvents: Bool {
         if case .mouseButton = self { return true }
         return false
@@ -73,6 +82,13 @@ public enum ModifierKey: String, Codable, CaseIterable, Sendable {
         case .control, .leftControl, .rightControl:
             return (CGEventFlags.maskControl.rawValue, Self.lCtl, Self.rCtl)
         }
+    }
+
+    /// The same key, or "either" and one side of it.
+    public func overlaps(_ other: ModifierKey) -> Bool {
+        guard family.generic == other.family.generic else { return false }
+        let either: Set<ModifierKey> = [.shift, .option, .command, .control]
+        return self == other || either.contains(self) || either.contains(other)
     }
 
     @inline(__always)

@@ -30,15 +30,22 @@ change that adds idle work or system-wide cost needs a very good reason.
    Meowse has doubled its launch memory it starts over the next time the
    display sleeps (`Refresh` in `MeowseCore`).
 6. **Native UI.** `NSMenu` for the menu bar, built the first time it opens.
+   Its rows draw themselves (`MenuRows.swift`): on macOS 27, system controls
+   and text fields inside a menu cost megabytes once it opens.
    SwiftUI only in the Settings window, which runs as its own process
    (`Meowse Settings.app` inside the bundle) and exits when the window closes,
    so what SwiftUI loads never stays in Meowse. (On macOS 27, `NSMenu`
    itself loads some SwiftUI the first time a menu opens: about 3 MB for even
-   a plain menu.) Standard controls and SF Symbols, no web views, no
-   third-party dependencies.
-7. **Lazy UI state.** Menu items refresh in `menuNeedsUpdate`. View code reads
+   a plain menu.) SF Symbols throughout and standard controls in Settings,
+   no web views, no third-party dependencies.
+7. **Root only where macOS requires it.** Run With Lid Closed needs
+   `meowse-lid` (`Sources/MeowseLid`), a launchd daemon registered with
+   `SMAppService`. It holds lid-close sleep off only while Meowse keeps an
+   XPC connection to it, accepts only the app it ships in signed by the same
+   team, and turns sleep back on when the connection ends.
+8. **Lazy UI state.** Menu items refresh in `menuNeedsUpdate`. View code reads
    cached values and never makes system calls. Writes to disk are coalesced.
-8. **Logic in `MeowseCore`.** Anything that can be pure lives there, without
+9. **Logic in `MeowseCore`.** Anything that can be pure lives there, without
    AppKit, and has unit tests.
 
 ## Workflow

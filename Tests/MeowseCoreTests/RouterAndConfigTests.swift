@@ -173,13 +173,12 @@ final class RouterAndConfigTests: XCTestCase {
     }
 
     func testDecodingClampsHandEditedValues() throws {
-        let json = #"{"notchDistance": -5, "glideTime": 1e300, "fasterFactor": 0, "wiggleInterval": 0, "awakeDuration": -60}"#
+        let json = #"{"notchDistance": -5, "glideTime": 1e300, "fasterFactor": 0, "wiggleInterval": 0}"#
         let s = try JSONDecoder().decode(Settings.self, from: Data(json.utf8))
         XCTAssertEqual(s.notchDistance, Settings.notchDistanceRange.lowerBound)
         XCTAssertEqual(s.glideTime, Settings.glideTimeRange.upperBound)
         XCTAssertEqual(s.fasterFactor, Settings.fasterFactorRange.lowerBound)
         XCTAssertEqual(s.wiggleInterval, 30, "a zero interval would wiggle in a busy loop")
-        XCTAssertEqual(s.awakeDuration, 0)
     }
 
     func testSettingsRoundTrip() throws {

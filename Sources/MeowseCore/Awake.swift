@@ -3,8 +3,34 @@ import Foundation
 /// Keep Awake and Wiggle Cursor helpers.
 public enum Awake {
 
-    /// Session lengths offered in the UI; 0 means until turned off.
-    public static let durations: [TimeInterval] = [0, 15 * 60, 30 * 60, 3600, 2 * 3600, 4 * 3600, 8 * 3600]
+    /// The menu's one-click lengths.
+    public static let pills: [TimeInterval] = [15 * 60, 30 * 60, 3600, 2 * 3600, 4 * 3600]
+
+    // "Until…": an end time on the quarter hour, from 15 minutes to a day ahead.
+
+    /// The end time offered first: an hour from now, on the next quarter hour.
+    public static func untilStart(now: Date, calendar: Calendar = .current) -> Date {
+        quarter(now.addingTimeInterval(3600), up: true, calendar)
+    }
+
+    /// The quarter hour after or before `time`, kept in range.
+    public static func untilStep(_ time: Date, up: Bool, now: Date, calendar: Calendar = .current) -> Date {
+        let next = up ? quarter(time, up: false, calendar).addingTimeInterval(15 * 60)
+                      : quarter(time, up: true, calendar).addingTimeInterval(-15 * 60)
+        let earliest = quarter(now.addingTimeInterval(15 * 60), up: true, calendar)
+        let latest = quarter(now.addingTimeInterval(24 * 3600), up: false, calendar)
+        return min(max(next, earliest), latest)
+    }
+
+    /// `date` rounded to a quarter hour, up or down; one already on it stays.
+    private static func quarter(_ date: Date, up: Bool, _ calendar: Calendar) -> Date {
+        var c = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let onQuarter = c.minute! % 15 == 0 && c.second == 0
+        c.minute = c.minute! / 15 * 15
+        c.second = 0
+        let down = calendar.date(from: c)!
+        return up && !onQuarter ? down.addingTimeInterval(15 * 60) : down
+    }
 
     /// Idle intervals after which the cursor is wiggled.
     public static let wiggleIntervals: [TimeInterval] = [30, 60, 120, 240]
@@ -36,12 +62,17 @@ public enum Awake {
         return durationLabel(seconds)
     }
 
-    /// Compact countdown for menu subtitles: "52 min left", "1 hr 5 min left".
+    /// The menu's lengths: "15m", "1h 30m", "Indefinitely" for until turned off.
+    public static func shortLabel(_ seconds: TimeInterval) -> String {
+        if seconds <= 0 { return "Indefinitely" }
+        let minutes = Int((seconds / 60).rounded())
+        if minutes < 60 { return "\(minutes)m" }
+        return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
+    }
+
+    /// Time left, as short as the picker's labels: "52m left", "1h 5m left".
     public static func remainingLabel(_ seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded(.up))
-        if minutes <= 1 { return "Less than a minute left" }
-        if minutes < 60 { return "\(minutes) min left" }
-        let h = minutes / 60, m = minutes % 60
-        return m == 0 ? "\(h) hr left" : "\(h) hr \(m) min left"
+        let minutes = max(1, Int((seconds / 60).rounded(.up)))
+        return shortLabel(TimeInterval(minutes * 60)) + " left"
     }
 }

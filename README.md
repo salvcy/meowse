@@ -12,7 +12,7 @@
 - **Reverse direction**, vertically and horizontally, independent of the trackpad setting.
 - **Hold-to-modify hotkeys**: hold a modifier key or mouse button while scrolling to scroll faster, scroll horizontally, or turn smoothing off.
 - **Simulated trackpad momentum**, so apps rubber-band and treat the glide as a fling.
-- **Keep Awake** for a set time or until turned off, optionally letting the display sleep.
+- **Keep Awake** for 15 minutes to 4 hours in one click, until a time you pick, or until turned off, optionally letting the display sleep or keeping a MacBook running with its lid closed.
 - **Wiggle Cursor** to stay active in chat apps while you're away from the keyboard.
 - **In-app updates**, verified against the developer's code signature.
 
@@ -38,6 +38,8 @@ Meowse checks for a new release at most once a day, at a time macOS chooses to s
 ## Privacy
 
 Meowse collects nothing. Its only network request is the update check to GitHub, which you can turn off in Settings.
+
+Run With Lid Closed is the only part that runs as root: a small helper that an administrator allows once, and that macOS starts only while the option is in use. It accepts requests only from Meowse, and turns sleep back on whenever Meowse lets go, quits or crashes, or the battery falls to 20%.
 
 ## Efficiency
 

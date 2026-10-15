@@ -57,10 +57,32 @@ rm -rf "$ICONS"
   "$HELPER/Contents/Info.plist"
 strip -x "$HELPER/Contents/MacOS/Meowse Settings"
 
-# Inside out: the helper's signature is sealed into Meowse's.
+# The lid helper: a launchd daemon inside the app that macOS runs as root once
+# an administrator allows it, and then only while Meowse keeps the Mac awake
+# with the lid closed. It's named for the app, so a copy with another bundle
+# identifier has its own.
+APP_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" Resources/Info.plist)
+LID="$APP/Contents/MacOS/meowse-lid"
+cp "$BIN/MeowseLid" "$LID"
+strip -x "$LID"
+mkdir -p "$APP/Contents/Library/LaunchDaemons"
+/usr/libexec/PlistBuddy \
+  -c "Add :Label string $APP_ID.lid" \
+  -c "Add :BundleProgram string Contents/MacOS/meowse-lid" \
+  -c "Add :MachServices dict" \
+  -c "Add :MachServices:$APP_ID.lid bool true" \
+  -c "Add :AssociatedBundleIdentifiers array" \
+  -c "Add :AssociatedBundleIdentifiers:0 string $APP_ID" \
+  -c "Add :RunAtLoad bool true" \
+  -c "Add :KeepAlive dict" \
+  -c "Add :KeepAlive:SuccessfulExit bool false" \
+  "$APP/Contents/Library/LaunchDaemons/$APP_ID.lid.plist" >/dev/null
+
+# Inside out: the helpers' signatures are sealed into Meowse's.
 TS=--timestamp=none
 [[ ${TIMESTAMP:-0} == 1 ]] && TS=--timestamp
 codesign --force --options runtime $TS --sign "$IDENTITY" "$HELPER"
+codesign --force --options runtime $TS --identifier "$APP_ID.lid" --sign "$IDENTITY" "$LID"
 codesign --force --options runtime $TS --sign "$IDENTITY" "$APP"
 codesign --verify --strict --deep "$APP"
 
