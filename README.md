@@ -2,7 +2,9 @@
 
 <h1 align="center">Meowse</h1>
 
-<p align="center">Smooth scrolling for mouse wheels, plus Keep Awake and Wiggle Cursor, in a menu bar app that uses no CPU when idle.</p>
+<p align="center"><b>Macs are made for trackpads. Meowse is for the rest of us.</b></p>
+
+<p align="center">Smooth scrolling for any mouse wheel, a scroll direction of its own, acceleration you can shape and side buttons that go back and forward, plus Keep Awake and Wiggle Cursor. Free, under 9 MB, and it uses no CPU when idle.</p>
 
 <p align="center"><a href="https://meowse.app">meowse.app</a> · <a href="https://github.com/salvcy/meowse/releases/latest/download/Meowse.zip">Download</a> · <a href="https://meowse.app/changelog">Changelog</a></p>
 
