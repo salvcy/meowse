@@ -87,20 +87,23 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                        device: store.scrollDevice, touch: store.touchKind)
     }
 
-    /// Gray while scrolling isn't handled, for the reason the menu gives.
+    /// The wheel shows only while scrolling is handled; the menu gives the
+    /// reason when it isn't. Gray means Meowse is doing nothing at all: no
+    /// scrolling, no Keep Awake, no Wiggle Cursor.
     /// Changes fade, and the eyes blink open or shut, unless Reduce Motion is on.
     func updateIcon() {
         guard let button = statusItem?.button else { return }
         let pause = self.pause
+        let dimmed = pause != nil && !awake.isAwake && !awake.isWiggling
         let look = Look(eyes: awake.isAwake ? .open : .none, wiggling: awake.isWiggling,
-                        update: updater.availableVersion != nil)
+                        update: updater.availableVersion != nil, wheel: pause == nil)
         describe(button, pause: pause)
 
         let animate = shown != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let blinking = animate && awake.isAwake != eyesOpen
         eyesOpen = awake.isAwake
         blink += 1
-        guard blinking else { return show(look, dimmed: pause != nil, fade: animate) }
+        guard blinking else { return show(look, dimmed: dimmed, fade: animate) }
 
         // Opening, the eyes pass through closed and half open; closing, the reverse.
         let id = blink
@@ -110,7 +113,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             frame.eyes = eyes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.07 * Double(i)) { [weak self] in
                 guard let self, self.blink == id else { return }
-                self.show(frame, dimmed: self.pause != nil, fade: false)
+                self.show(frame, dimmed: dimmed, fade: false)
             }
         }
     }
@@ -415,13 +418,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     // MARK: - Icon
 
-    /// The eyes open while Keep Awake is on, motion lines show Wiggle, and a
-    /// dot means an update is waiting.
+    /// The eyes open while Keep Awake is on, motion lines show Wiggle, a
+    /// dot means an update is waiting, and the wheel shows scrolling is on.
     private struct Look: Equatable {
         enum Eyes { case none, closed, half, open }
         var eyes = Eyes.none
         var wiggling = false
         var update = false
+        var wheel = true
     }
 
     /// A mouse with cat ears, from the website's 24-unit outline scaled to the
@@ -441,9 +445,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                 glyph.line(to: NSPoint(x: ear[1].0, y: ear[1].1))
                 glyph.line(to: NSPoint(x: ear[2].0, y: ear[2].1))
             }
-            // Shorter with eyes, to leave them room.
-            glyph.move(to: NSPoint(x: 12, y: 4.5))
-            glyph.line(to: NSPoint(x: 12, y: look.eyes == .none ? 9.5 : 8))
+            // The wheel: shorter with eyes, to leave them room.
+            if look.wheel {
+                glyph.move(to: NSPoint(x: 12, y: 4.5))
+                glyph.line(to: NSPoint(x: 12, y: look.eyes == .none ? 9.5 : 8))
+            }
             fit(glyph)
             glyph.lineWidth = 1.6 * 0.8
             glyph.lineCapStyle = .round
