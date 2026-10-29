@@ -21,6 +21,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     var willOpen: () -> Void = {}
     var trusted = false { didSet { updateIcon() } }
     var engineStatus: Engine.TapStatus = .off { didSet { updateIcon() } }
+    /// Cached on settings changes; icon updates never query devices or rebuild the config.
+    var configuration: EngineConfig { didSet { updateIcon() } }
+    var pointerActive = false { didSet { if pointerActive != oldValue { updateIcon() } } }
 
     /// What the icon draws now; nil while it's hidden.
     private var shown: Look?
@@ -58,6 +61,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         self.awake = awake
         self.updater = updater
         self.lid = lid
+        configuration = EngineConfig(store.settings)
         super.init()
         menu.delegate = self
         menu.autoenablesItems = false
@@ -87,17 +91,22 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                        device: store.scrollDevice, touch: store.touchKind)
     }
 
+    private var activity: MenuBarStatus {
+        MenuBarStatus(configuration: configuration, pause: pause, trusted: trusted, engine: engineStatus,
+                      pointerActive: pointerActive, awake: awake.isAwake, wiggling: awake.isWiggling)
+    }
+
     /// The wheel shows only while scrolling is handled; the menu gives the
     /// reason when it isn't. Gray means Meowse is doing nothing at all: no
-    /// scrolling, no Keep Awake, no Wiggle Cursor.
+    /// scrolling, mouse shortcuts, applied pointer settings, Keep Awake or Wiggle Cursor.
     /// Changes fade, and the eyes blink open or shut, unless Reduce Motion is on.
     func updateIcon() {
         guard let button = statusItem?.button else { return }
-        let pause = self.pause
-        let dimmed = pause != nil && !awake.isAwake && !awake.isWiggling
+        let activity = self.activity
+        let dimmed = activity.dimmed
         let look = Look(eyes: awake.isAwake ? .open : .none, wiggling: awake.isWiggling,
-                        update: updater.availableVersion != nil, wheel: pause == nil)
-        describe(button, pause: pause)
+                        update: updater.availableVersion != nil, wheel: activity.wheel)
+        describe(button, activity: activity)
 
         let animate = shown != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let blinking = animate && awake.isAwake != eyesOpen
@@ -135,9 +144,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
     /// The tooltip and VoiceOver say what the icon shows. A timed Keep Awake
     /// gives its end time, which never needs updating.
-    private func describe(_ button: NSStatusBarButton, pause: ScrollingPause?) {
-        var lines = ["Meowse"]
-        if let pause { lines.append("Scrolling: \(pause.label)") }
+    private func describe(_ button: NSStatusBarButton, activity: MenuBarStatus) {
+        var lines = ["Meowse", "Scrolling: \(activity.scrollingLabel)"]
+        if activity.shortcuts { lines.append("Mouse shortcuts: On") }
+        if activity.pointer { lines.append("Pointer settings: Applied") }
         if awake.isAwake {
             lines.append(awake.awakeUntil.map { "Keeping awake until \($0.formatted(date: .omitted, time: .shortened))" }
                          ?? "Keeping awake")
@@ -360,9 +370,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func refresh() {
         guard scrollingRow != nil else { return }
         let s = store.settings
-        // Whenever the icon is gray, the menu says why; paused shows as the switch.
+        // Explain the missing wheel even while another feature keeps the icon full.
         scrollingRow.isOn = s.enabled
-        scrollingRow.detailText = pause.flatMap { $0 == .paused ? nil : $0.label } ?? ""
+        scrollingRow.detailText = !s.enabled || activity.wheel ? "" : activity.scrollingLabel
         smoothRow.isOn = s.smooth
         // Mixed when Settings reverses only one direction; a click turns both on.
         reverseRow.isOn = s.reverseVertical && s.reverseHorizontal

@@ -10,19 +10,27 @@ import MeowseCore
 /// settings are followed.
 final class PointerControl {
 
-    /// Called on the main thread when a mouse connects.
+    /// Called on the main thread when a mouse connects or disconnects.
     var onDevicesChange: (() -> Void)?
+    /// Cached activity for the menu bar; a requested setting is not necessarily applied.
+    var onActivityChange: ((Bool) -> Void)?
+    private(set) var isActive = false {
+        didSet { if isActive != oldValue { onActivityChange?(isActive) } }
+    }
 
     private var wanted: PointerOverride?
     private var externalOnly = true
     /// What each mouse has from Meowse, by registry ID.
     private var applied: [UInt64: PointerOverride] = [:]
+    /// Successful writes only; failed partial writes still need restoring on quit.
+    private var confirmed: Set<UInt64> = []
     /// Mice given a table of Meowse's, which gets the mouse's own back afterwards.
     private var tables: Set<UInt64> = []
     /// Held only while Meowse's settings are applied.
     private var client: IOHIDEventSystemClient?
     private var port: IONotificationPortRef?
     private var added: io_iterator_t = 0
+    private var removed: io_iterator_t = 0
     private var pending: DispatchWorkItem?
 
     private static let accelerationKey = "HIDMouseAcceleration" as CFString
@@ -66,6 +74,7 @@ final class PointerControl {
     func reapply() {
         guard wanted != nil, let client else { return }
         applied.removeAll()
+        confirmed.removeAll()
         sync(client, Self.macSettings(client))
     }
 
@@ -89,21 +98,42 @@ final class PointerControl {
     // MARK: - Services
 
     private func sync(_ c: IOHIDEventSystemClient, _ mac: PointerInfo) {
-        for mouse in Self.mice(c) {
+        let mice = Self.mice(c)
+        for mouse in mice {
             guard let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { continue }
             if let wanted, !externalOnly || !Self.isApple(mouse) {
                 if applied[id] != wanted {
-                    set(mouse, id, wanted)
+                    if set(mouse, id, wanted) {
+                        confirmed.insert(id)
+                    } else {
+                        confirmed.remove(id)
+                    }
                     applied[id] = wanted
                 }
             } else if applied.removeValue(forKey: id) != nil {
+                confirmed.remove(id)
                 set(mouse, id, mac.own)
             }
         }
-        if wanted == nil { applied.removeAll() }
+        if wanted == nil { applied.removeAll(); confirmed.removeAll() }
+        updateActivity(mice)
     }
 
-    private func set(_ mouse: IOHIDServiceClient, _ id: UInt64, _ o: PointerOverride) {
+    /// A disconnection only updates bookkeeping; it must not apply settings
+    /// to a different mouse that may still be finishing its setup.
+    private func updateActivity(_ mice: [IOHIDServiceClient]) {
+        let connected = Set(mice.compactMap { (IOHIDServiceClientGetRegistryID($0) as? NSNumber)?.uint64Value })
+        applied = applied.filter { connected.contains($0.key) }
+        confirmed.formIntersection(connected)
+        tables.formIntersection(connected)
+        isActive = mice.contains { mouse in
+            guard Self.isMouse(mouse), let id = (IOHIDServiceClientGetRegistryID(mouse) as? NSNumber)?.uint64Value else { return false }
+            return confirmed.contains(id)
+        }
+    }
+
+    @discardableResult
+    private func set(_ mouse: IOHIDServiceClient, _ id: UInt64, _ o: PointerOverride) -> Bool {
         let fixed = { (v: Double) in NSNumber(value: Int64((v * 65536).rounded())) }
         func dictionary(_ c: PointerCurves.Parametric) -> [String: NSNumber] {
             ["HIDAccelIndex": fixed(c.index), "HIDAccelGainLinear": fixed(c.gainLinear),
@@ -136,6 +166,7 @@ final class PointerControl {
             && IOHIDServiceClientSetProperty(mouse, Self.accelerationKey, fixed(o.acceleration))
             && ok
         if !ok { NSLog("Meowse: couldn't set the pointer settings") }
+        return ok
     }
 
     /// Services whose pointer follows the mouse Tracking speed, the
@@ -203,6 +234,7 @@ final class PointerControl {
             pending?.cancel()
             pending = nil
             if added != 0 { IOObjectRelease(added); added = 0 }
+            if removed != 0 { IOObjectRelease(removed); removed = 0 }
             if let port { IONotificationPortDestroy(port) }
             port = nil
             return
@@ -217,6 +249,15 @@ final class PointerControl {
         IOServiceAddMatchingNotification(newPort, kIOFirstMatchNotification, IOServiceMatching("IOHIDEventService"),
                                          callback, Unmanaged.passUnretained(self).toOpaque(), &added)
         Self.drain(added)  // arms the notification
+        let removal: IOServiceMatchingCallback = { refcon, iterator in
+            PointerControl.drain(iterator)
+            let control = Unmanaged<PointerControl>.fromOpaque(refcon!).takeUnretainedValue()
+            if let client = control.client { control.updateActivity(PointerControl.mice(client)) }
+            control.onDevicesChange?()
+        }
+        IOServiceAddMatchingNotification(newPort, kIOTerminatedNotification, IOServiceMatching("IOHIDEventService"),
+                                         removal, Unmanaged.passUnretained(self).toOpaque(), &removed)
+        Self.drain(removed)
     }
 
     private static func drain(_ iterator: io_iterator_t) {
