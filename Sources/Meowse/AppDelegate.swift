@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         engineConfig = EngineConfig(store.settings, excludedPaths: excludedPaths)
         engine.apply(engineConfig)
         rebuildScreens()
+        pointer.onActivityChange = { [weak self] active in self?.statusMenu.pointerActive = active }
         pointer.update(store.settings)
         pointer.onDevicesChange = { [weak self] in self?.refreshPointerInfo() }
 
@@ -87,6 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if config != engineConfig {
             engineConfig = config
             engine.apply(config)
+            // A buttons-only tap can stay active while the wheel's settings change.
+            statusMenu.configuration = config
         }
         if new.pointerAcceleration != old.pointerAcceleration || new.pointerSpeed != old.pointerSpeed
             || new.pointerCurve != old.pointerCurve || new.pointerScale != old.pointerScale
