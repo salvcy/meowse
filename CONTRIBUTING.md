@@ -53,6 +53,12 @@ change that adds idle work or system-wide cost needs a very good reason.
    cached values and never makes system calls. Writes to disk are coalesced.
 9. **Logic in `MeowseCore`.** Anything that can be pure lives there, without
    AppKit, and has unit tests.
+10. **Every visible string is translatable.** SwiftUI text literals already
+   are; anything held as a `String` (menu rows, alerts, labels from
+   `MeowseCore`) goes through `String(localized:)`. Build sentences as one
+   string with placeholders, never by joining or changing the case of pieces.
+   Run `scripts/strings.sh` to add new strings to
+   `Resources/Localizable.xcstrings`; `build.sh` compiles it into both apps.
 
 ## Workflow
 
@@ -61,6 +67,7 @@ swift test               # unit tests
 scripts/build.sh         # release build → build/Meowse.app
 scripts/install.sh       # build and move into /Applications, then relaunch
 scripts/measure.sh       # CPU, idle wakeups and memory of the running app
+scripts/strings.sh       # update the translation catalog from the code
 scripts/release.sh 1.2.0 # version bump, build and dist/Meowse.zip
 ```
 

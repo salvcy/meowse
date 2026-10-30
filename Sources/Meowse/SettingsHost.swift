@@ -47,6 +47,10 @@ final class SettingsHost {
     private func launch() -> Bool {
         let p = Process()
         p.executableURL = helper.appendingPathComponent("Contents/MacOS/Meowse Settings")
+        // The window speaks the menu's language, including one picked for
+        // Meowse alone in System Settings, which the helper wouldn't see.
+        let languages = Bundle.main.preferredLocalizations.map { "\"\($0)\"" }.joined(separator: ",")
+        p.arguments = ["-AppleLanguages", "(\(languages))"]
         let input = Pipe(), output = Pipe()
         p.standardInput = input
         p.standardOutput = output

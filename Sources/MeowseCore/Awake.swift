@@ -48,31 +48,33 @@ public enum Awake {
 
     /// "Until Turned Off", "15 Minutes", "1 Hour", "2 Hours".
     public static func durationLabel(_ seconds: TimeInterval) -> String {
-        if seconds <= 0 { return "Until Turned Off" }
+        if seconds <= 0 { return String(localized: "Until Turned Off") }
         let minutes = Int((seconds / 60).rounded())
-        if minutes < 60 { return minutes == 1 ? "1 Minute" : "\(minutes) Minutes" }
+        if minutes < 60 { return minutes == 1 ? String(localized: "1 Minute") : String(localized: "\(minutes) Minutes") }
         let hours = minutes / 60, rest = minutes % 60
-        let h = hours == 1 ? "1 Hour" : "\(hours) Hours"
-        return rest == 0 ? h : "\(h) \(rest) Minutes"
+        let h = hours == 1 ? String(localized: "1 Hour") : String(localized: "\(hours) Hours")
+        return rest == 0 ? h : String(localized: "\(h) \(rest) Minutes", comment: "Hours, then minutes: “1 Hour 30 Minutes”")
     }
 
     /// "30 Seconds", "1 Minute", "4 Minutes".
     public static func intervalLabel(_ seconds: TimeInterval) -> String {
-        if seconds < 60 { return "\(Int(seconds)) Seconds" }
+        if seconds < 60 { return String(localized: "\(Int(seconds)) Seconds") }
         return durationLabel(seconds)
     }
 
     /// The menu's lengths: "15m", "1h 30m", "Indefinitely" for until turned off.
     public static func shortLabel(_ seconds: TimeInterval) -> String {
-        if seconds <= 0 { return "Indefinitely" }
+        if seconds <= 0 { return String(localized: "Indefinitely", comment: "Keep Awake length with no end, on a small button") }
         let minutes = Int((seconds / 60).rounded())
-        if minutes < 60 { return "\(minutes)m" }
-        return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
+        if minutes < 60 { return String(localized: "\(minutes)m", comment: "Minutes, abbreviated, on a small button") }
+        return minutes % 60 == 0
+            ? String(localized: "\(minutes / 60)h", comment: "Hours, abbreviated, on a small button")
+            : String(localized: "\(minutes / 60)h \(minutes % 60)m", comment: "Hours and minutes, abbreviated, on a small button")
     }
 
     /// Time left, as short as the picker's labels: "52m left", "1h 5m left".
     public static func remainingLabel(_ seconds: TimeInterval) -> String {
         let minutes = max(1, Int((seconds / 60).rounded(.up)))
-        return shortLabel(TimeInterval(minutes * 60)) + " left"
+        return String(localized: "\(shortLabel(TimeInterval(minutes * 60))) left", comment: "Keep Awake time remaining: “52m left”")
     }
 }

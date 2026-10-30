@@ -134,13 +134,13 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// gives its end time, which never needs updating.
     private func describe(_ button: NSStatusBarButton, pause: ScrollingPause?) {
         var lines = ["Meowse"]
-        if let pause { lines.append("Scrolling: \(pause.label)") }
+        if let pause { lines.append(String(localized: "Scrolling: \(pause.label)", comment: "Menu bar icon tooltip")) }
         if awake.isAwake {
-            lines.append(awake.awakeUntil.map { "Keeping awake until \($0.formatted(date: .omitted, time: .shortened))" }
-                         ?? "Keeping awake")
+            lines.append(awake.awakeUntil.map { String(localized: "Keeping awake until \($0.formatted(date: .omitted, time: .shortened))") }
+                         ?? String(localized: "Keeping awake"))
         }
-        if awake.isWiggling { lines.append("Wiggling the cursor when idle") }
-        if let version = updater.availableVersion { lines.append("Meowse \(version) is available") }
+        if awake.isWiggling { lines.append(String(localized: "Wiggling the cursor when idle")) }
+        if let version = updater.availableVersion { lines.append(String(localized: "Meowse \(version) is available")) }
         let tip = lines.joined(separator: "\n")
         guard button.toolTip != tip else { return }
         button.toolTip = tip
@@ -155,10 +155,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// Awake's length is set on a slider right under it. Wiggle's interval and whether
     /// the display may sleep are set in Settings.
     private func buildMenu() {
-        permissionItem = action(ActionRow("Allow Accessibility Access…", symbol: "exclamationmark.triangle.fill") { [weak self] in
+        permissionItem = action(ActionRow(String(localized: "Allow Accessibility Access…"), symbol: "exclamationmark.triangle.fill") { [weak self] in
             self?.requestPermission()
         })
-        engineFailedItem = action(ActionRow("Scrolling Didn’t Start: Retry", symbol: "exclamationmark.triangle.fill") { [weak self] in
+        engineFailedItem = action(ActionRow(String(localized: "Scrolling Didn’t Start: Retry"), symbol: "exclamationmark.triangle.fill") { [weak self] in
             self?.retryEngine()
         })
         permissionSeparator = .separator()
@@ -166,14 +166,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(engineFailedItem)
         menu.addItem(permissionSeparator)
 
-        scrollingRow = ToggleRow("Scrolling")
+        scrollingRow = ToggleRow(String(localized: "Scrolling", comment: "Settings tab, and a menu section header with a switch"))
         scrollingRow.onToggle = { [weak self] on in
             self?.store.settings.enabled = on
             self?.refresh()
         }
-        smoothRow = ToggleRow("Smooth Scrolling", symbol: "scroll", accessory: .check)
+        smoothRow = ToggleRow(String(localized: "Smooth Scrolling"), symbol: "scroll", accessory: .check)
         smoothRow.onToggle = { [weak self] on in self?.store.settings.smooth = on }
-        reverseRow = ToggleRow("Reverse Direction", symbol: "arrow.up.arrow.down", accessory: .check)
+        reverseRow = ToggleRow(String(localized: "Reverse Direction"), symbol: "arrow.up.arrow.down", accessory: .check)
         reverseRow.onToggle = { [weak self] on in
             self?.store.settings.reverseVertical = on
             self?.store.settings.reverseHorizontal = on
@@ -181,20 +181,20 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         [scrollingRow, smoothRow, reverseRow].forEach { menu.addItem(viewItem($0)) }
 
         menu.addItem(.separator())
-        menu.addItem(viewItem(ToggleRow("Awake", accessory: .none)))
+        menu.addItem(viewItem(ToggleRow(String(localized: "Awake", comment: "Menu section header"), accessory: .none)))
         buildAwake()
 
         menu.addItem(.separator())
-        let settings = action(ActionRow("Settings…", symbol: "gearshape", shortcut: "⌘,") { [weak self] in self?.openSettings() })
+        let settings = action(ActionRow(String(localized: "Settings…"), symbol: "gearshape", shortcut: "⌘,") { [weak self] in self?.openSettings() })
         settings.keyEquivalent = ","
         settings.action = #selector(settingsClicked)
         menu.addItem(settings)
         // Shown only once an update has been found.
-        updateRow = ActionRow("Update Meowse…", symbol: "arrow.down.circle", badge: "New") { [weak self] in self?.openUpdates() }
+        updateRow = ActionRow(String(localized: "Update Meowse…"), symbol: "arrow.down.circle", badge: String(localized: "New", comment: "Badge on the update menu item")) { [weak self] in self?.openUpdates() }
         updateItem = action(updateRow)
         updateItem.isHidden = true
         menu.addItem(updateItem)
-        let quit = action(ActionRow("Quit Meowse", symbol: "power", shortcut: "⌘Q") { NSApp.terminate(nil) })
+        let quit = action(ActionRow(String(localized: "Quit Meowse"), symbol: "power", shortcut: "⌘Q") { NSApp.terminate(nil) })
         quit.keyEquivalent = "q"
         quit.action = #selector(NSApplication.terminate(_:))
         quit.target = nil
@@ -206,7 +206,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// alone, are whether the display may sleep and running with the lid
     /// closed. Wiggle Cursor comes after, a feature of its own.
     private func buildAwake() {
-        keepAwakeRow = ToggleRow("Keep Awake", symbol: "cup.and.saucer")
+        keepAwakeRow = ToggleRow(String(localized: "Keep Awake"), symbol: "cup.and.saucer")
         keepAwakeRow.onToggle = { [weak self] on in
             guard let self else { return }
             on ? self.awake.startAwake(duration: 0, allowDisplaySleep: self.store.settings.awakeAllowDisplaySleep)
@@ -244,7 +244,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         untilItem.isHidden = true
         menu.addItem(untilItem)
 
-        optionsRow = DisclosureRow("Options")
+        optionsRow = DisclosureRow(String(localized: "Options", comment: "Shows more Keep Awake options"))
         optionsRow.isOpen = UserDefaults.standard.bool(forKey: Self.optionsOpenKey)
         optionsRow.onToggle = { [weak self] open in
             UserDefaults.standard.set(open, forKey: Self.optionsOpenKey)
@@ -253,12 +253,12 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(viewItem(optionsRow))
 
-        displaySleepRow = ToggleRow("Allow Display to Sleep", symbol: "display", accessory: .check, indented: true)
+        displaySleepRow = ToggleRow(String(localized: "Allow Display to Sleep"), symbol: "display", accessory: .check, indented: true)
         displaySleepRow.onToggle = { [weak self] on in
             self?.store.settings.awakeAllowDisplaySleep = on  // AppDelegate updates a running session
             self?.refresh()
         }
-        lidRow = ToggleRow("Run With Lid Closed", symbol: "laptopcomputer", accessory: .check, indented: true)
+        lidRow = ToggleRow(String(localized: "Run With Lid Closed"), symbol: "laptopcomputer", accessory: .check, indented: true)
         lidRow.onToggle = { [weak self] on in
             self?.store.settings.awakeLidClosed = on  // AppDelegate asks for the helper's approval
             self?.refresh()
@@ -274,7 +274,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         menu.addItem(lidNoteItem)
 
-        wiggleRow = ToggleRow("Wiggle Cursor", symbol: "cursorarrow.motionlines")
+        wiggleRow = ToggleRow(String(localized: "Wiggle Cursor"), symbol: "cursorarrow.motionlines")
         wiggleRow.onToggle = { [weak self] on in
             guard let self else { return }
             on ? self.awake.startWiggle(interval: self.store.settings.wiggleInterval) : self.awake.stopWiggle()
@@ -291,7 +291,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
             intervalItems.append(i)
             intervals.addItem(i)
         }
-        wiggleEveryItem = viewItem(SubmenuRow("Wiggle When Idle For", symbol: "hourglass", indented: true))
+        wiggleEveryItem = viewItem(SubmenuRow(String(localized: "Wiggle When Idle For"), symbol: "hourglass", indented: true))
         wiggleEveryItem.submenu = intervals
         menu.addItem(wiggleEveryItem)
     }
@@ -349,7 +349,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
 
         let update = updater.availableVersion
         updateItem.isHidden = update == nil
-        if let update { updateRow.setTitle("Update to Meowse \(update)…") }
+        if let update { updateRow.setTitle(String(localized: "Update to Meowse \(update)…")) }
         refresh()
     }
 
@@ -372,7 +372,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         keepAwakeRow.detailSymbol = nil
         switch awake.session {
         case .length?: keepAwakeRow.detailText = awake.awakeRemaining.map(Awake.remainingLabel) ?? ""
-        case .until(let end)?: keepAwakeRow.detailText = "Until " + end.formatted(date: .omitted, time: .shortened)
+        case .until(let end)?: keepAwakeRow.detailText = String(localized: "Until \(end.formatted(date: .omitted, time: .shortened))")
         case .indefinite?:
             keepAwakeRow.detailText = ""
             keepAwakeRow.detailSymbol = "infinity"  // on with no end
@@ -388,20 +388,20 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         // Collapsed, Options says how many of its switches are on.
         let on = [s.awakeAllowDisplaySleep, s.awakeLidClosed].filter { $0 }.count
-        optionsRow.detailText = optionsRow.isOpen || on == 0 ? "" : "\(on) on"
+        optionsRow.detailText = optionsRow.isOpen || on == 0 ? "" : String(localized: "\(on) on", comment: "How many Options switches are on: “1 on”")
 
         lidRow.isOn = s.awakeLidClosed
         var note = ""
         if s.awakeLidClosed {
             if lid.needsApproval {
-                note = "Needs permission"
-                lidNote.set(note, action: "Open Settings")
+                note = String(localized: "Needs permission")
+                lidNote.set(note, action: String(localized: "Open Settings"))
             } else if lid.state == .lowBattery {
-                note = "Off while the battery is low"
+                note = String(localized: "Off while the battery is low")
                 lidNote.set(note)
             } else if lid.state == .failed {
-                note = "Couldn’t start"
-                lidNote.set(note, action: "Open Settings")
+                note = String(localized: "Couldn’t start", comment: "Run With Lid Closed status")
+                lidNote.set(note, action: String(localized: "Open Settings"))
             }
         }
         lidNoteItem.isHidden = note.isEmpty || !optionsRow.isOpen
