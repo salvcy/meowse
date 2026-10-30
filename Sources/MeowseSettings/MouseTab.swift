@@ -67,7 +67,7 @@ struct MouseTab: View {
             .font(.callout)
         } footer: {
             caption(line
-                ? "Without acceleration the pointer goes the same distance for every bit the mouse moves. Drag the dot to set how far."
+                ? "Without acceleration, the pointer moves in step with the mouse, however fast you move it. Drag the dot to set the speed."
                 : "Drag the middle dot to make the whole curve faster or slower. The outer dots reshape it, for slow, careful movements and for fast ones; Option-drag the middle dot to move it alone. Your Mac’s own curve comes back when Meowse quits.")
         }
 
