@@ -95,14 +95,31 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         guard let button = statusItem?.button else { return }
         let pause = self.pause
         let dimmed = pause != nil && !awake.isAwake && !awake.isWiggling
-        let look = Look(eyes: awake.isAwake ? .open : .none, wiggling: awake.isWiggling,
+        var look = Look(eyes: awake.isAwake ? .open : .none, wiggling: awake.isWiggling,
                         update: updater.availableVersion != nil, wheel: pause == nil)
+        // Without the wheel above them, the eyes sit higher in the face.
+        if awake.isAwake && pause != nil { look.eyeLift = Look.liftedEyes }
         describe(button, pause: pause)
 
         let animate = shown != nil && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         let blinking = animate && awake.isAwake != eyesOpen
         eyesOpen = awake.isAwake
         blink += 1
+        let from = shown?.eyes == .open ? shown?.eyeLift : nil
+        if !blinking, animate, look.eyes == .open, let from, from != look.eyeLift {
+            // The eyes slide to their new height over four frames.
+            let id = blink
+            for i in 1...4 {
+                var frame = look
+                let t = Double(i) / 4
+                frame.eyeLift = from + (look.eyeLift - from) * t * t * (3 - 2 * t)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.035 * Double(i - 1)) { [weak self] in
+                    guard let self, self.blink == id else { return }
+                    self.show(frame, dimmed: dimmed, fade: false)
+                }
+            }
+            return
+        }
         guard blinking else { return show(look, dimmed: dimmed, fade: animate) }
 
         // Opening, the eyes pass through closed and half open; closing, the reverse.
@@ -426,6 +443,10 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         var wiggling = false
         var update = false
         var wheel = true
+        /// How far the eyes sit above their place under the wheel, in the
+        /// outline's 24-unit grid.
+        var eyeLift = 0.0
+        static let liftedEyes = 1.7
     }
 
     /// A mouse with cat ears, from the website's 24-unit outline scaled to the
@@ -461,14 +482,14 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                 case .none:
                     break
                 case .open:
-                    fit(NSBezierPath(ovalIn: NSRect(x: x - 1, y: 12, width: 2, height: 2))).fill()
+                    fit(NSBezierPath(ovalIn: NSRect(x: x - 1, y: 12 - look.eyeLift, width: 2, height: 2))).fill()
                 case .half:
-                    fit(NSBezierPath(ovalIn: NSRect(x: x - 1, y: 12.55, width: 2, height: 0.9))).fill()
+                    fit(NSBezierPath(ovalIn: NSRect(x: x - 1, y: 12.55 - look.eyeLift, width: 2, height: 0.9))).fill()
                 case .closed:
-                    let lid = NSBezierPath()
-                    lid.move(to: NSPoint(x: x - 1.25, y: 12.8))
-                    lid.curve(to: NSPoint(x: x + 1.25, y: 12.8),
-                              controlPoint1: NSPoint(x: x - 0.6, y: 13.8), controlPoint2: NSPoint(x: x + 0.6, y: 13.8))
+                    let lid = NSBezierPath(), y = 12.8 - look.eyeLift
+                    lid.move(to: NSPoint(x: x - 1.25, y: y))
+                    lid.curve(to: NSPoint(x: x + 1.25, y: y),
+                              controlPoint1: NSPoint(x: x - 0.6, y: y + 1), controlPoint2: NSPoint(x: x + 0.6, y: y + 1))
                     fit(lid)
                     lid.lineWidth = 0.95
                     lid.lineCapStyle = .round
