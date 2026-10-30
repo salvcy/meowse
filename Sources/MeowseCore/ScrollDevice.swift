@@ -51,8 +51,8 @@ public enum TouchKind: String, Codable, Sendable {
 
     public var name: String {
         switch self {
-        case .trackpad: return "trackpad"
-        case .magicMouse: return "Magic Mouse"
+        case .trackpad: return String(localized: "trackpad", comment: "Shown as “Idle (trackpad)”")
+        case .magicMouse: return String(localized: "Magic Mouse", comment: "Product name, shown as “Idle (Magic Mouse)”")
         }
     }
 

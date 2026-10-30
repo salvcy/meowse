@@ -329,7 +329,7 @@ final class NoteRow: NSView {
         guard note != self.note || action != self.action else { return }
         self.note = note
         self.action = action
-        setAccessibilityLabel(action.isEmpty ? note : "\(note). \(action)")
+        setAccessibilityLabel(action.isEmpty ? note : String(localized: "\(note). \(action)", comment: "VoiceOver: a status note, then its action"))
         needsDisplay = true
     }
 
@@ -426,7 +426,20 @@ final class PillsRow: NSView {
         autoresizingMask = .width
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Keep Awake for")
+        setAccessibilityLabel(String(localized: "Keep Awake for"))
+        // Longer labels, as in some languages, widen the menu rather than
+        // squeeze the pills. A menu is as wide as its widest row.
+        frame.size.width = max(Grid.width, neededWidth())
+    }
+
+    /// Every pill with room around its label, the Until pill showing the
+    /// wider of "Until…" and a late end time.
+    private func neededWidth() -> CGFloat {
+        let late = Calendar.current.date(bySettingHour: 22, minute: 45, second: 0, of: Date()) ?? Date()
+        let until = max(Self.text(label(untilIndex)).size().width,
+                        Self.text(late.formatted(date: .omitted, time: .shortened)).size().width) + 16
+        let pills = lengths.map { Self.text(Awake.shortLabel($0)).size().width }.reduce(until, +)
+        return Grid.header + Grid.trailing + pills + 10 * CGFloat(lengths.count + 1) + 5 * CGFloat(untilIndex)
     }
 
     @available(*, unavailable)
@@ -445,7 +458,7 @@ final class PillsRow: NSView {
     private func label(_ i: Int) -> String {
         guard i == untilIndex else { return Awake.shortLabel(lengths[i]) }
         if case .until(let end)? = session { return end.formatted(date: .omitted, time: .shortened) }
-        return "Until…"
+        return String(localized: "Until…", comment: "Keep Awake pill that picks an end time")
     }
 
     private static func text(_ string: String, color: NSColor = .labelColor) -> NSAttributedString {
@@ -524,7 +537,8 @@ final class PillsRow: NSView {
 
     override func accessibilityChildren() -> [Any]? {
         (0...untilIndex).map { i in
-            let name = i == untilIndex ? "Keep awake until a time" : "Keep awake for \(Awake.durationLabel(lengths[i]))"
+            let name = i == untilIndex ? String(localized: "Keep awake until a time")
+                : String(localized: "Keep awake for \(Awake.durationLabel(lengths[i]))")
             return DrawnPart(in: self, label: name, frame: { [weak self] in self?.frame(of: i) ?? .zero },
                         selected: { [weak self] in self?.isLit(i) ?? false }, press: { [weak self] in self?.press(i) })
         }
@@ -547,7 +561,7 @@ final class UntilRow: NSView {
         autoresizingMask = .width
         setAccessibilityElement(true)
         setAccessibilityRole(.group)
-        setAccessibilityLabel("Keep awake until")
+        setAccessibilityLabel(String(localized: "Keep awake until"))
     }
 
     @available(*, unavailable)
@@ -610,7 +624,7 @@ final class UntilRow: NSView {
         let start = frame(of: .start)
         NSColor.controlAccentColor.withAlphaComponent(hovered == .start ? 0.85 : 1).setFill()
         capsule(start).fill()
-        center(Self.text("Start", weight: .semibold, color: .white), in: start)
+        center(Self.text(String(localized: "Start", comment: "Starts Keep Awake until the chosen time; fits a small button"), weight: .semibold, color: .white), in: start)
     }
 
     override func updateTrackingAreas() {
@@ -660,8 +674,8 @@ final class UntilRow: NSView {
     }
 
     override func accessibilityChildren() -> [Any]? {
-        let until = "Keep awake until \(time.formatted(date: .omitted, time: .shortened))"
-        return [(Part.earlier, "Earlier"), (.later, "Later"), (.start, until)].map { part, name in
+        let until = String(localized: "Keep awake until \(time.formatted(date: .omitted, time: .shortened))")
+        return [(Part.earlier, String(localized: "Earlier")), (.later, String(localized: "Later")), (.start, until)].map { part, name in
             DrawnPart(in: self, label: name, frame: { [weak self] in self?.frame(of: part) ?? .zero },
                       selected: { false }, press: { [weak self] in self?.press(part) })
         }

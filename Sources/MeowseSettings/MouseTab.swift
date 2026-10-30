@@ -80,10 +80,16 @@ struct MouseTab: View {
     }
 
     private func readout(_ o: PointerOverride, custom: Bool) -> String {
-        if o.linear { return "Speed \(String(format: "%.2f", o.acceleration))×" }
-        if o.acceleration < 0 { return "Speed set by the mouse" }
-        if custom { return "Your curve" }
-        return o.scale == 1 ? "macOS curve" : "macOS curve, \(String(format: "%.2f", o.scale))×"
+        if o.linear { return String(localized: "Speed \(Self.times(o.acceleration))", comment: "Pointer speed multiplier: “Speed 1.25×”") }
+        if o.acceleration < 0 { return String(localized: "Speed set by the mouse") }
+        if custom { return String(localized: "Your curve") }
+        return o.scale == 1 ? String(localized: "macOS curve")
+            : String(localized: "macOS curve, \(Self.times(o.scale))", comment: "The system's curve, scaled: “macOS curve, 1.25×”")
+    }
+
+    /// "1.25×", with the user's decimal separator.
+    static func times(_ x: Double) -> String {
+        x.formatted(.number.precision(.fractionLength(2))) + "×"
     }
 }
 
@@ -199,7 +205,7 @@ final class GraphView: NSView {
         curve.lineCap = .round
         curve.lineJoin = .round
         dots.lineWidth = 2
-        for (label, text) in zip(labels, ["Pointer speed", "Mouse speed"]) {
+        for (label, text) in zip(labels, [String(localized: "Pointer speed", comment: "Graph axis"), String(localized: "Mouse speed", comment: "Graph axis")]) {
             label.string = text
             label.font = NSFont.systemFont(ofSize: 10)
             label.fontSize = 10
@@ -345,11 +351,14 @@ final class GraphView: NSView {
     override func isAccessibilityElement() -> Bool { true }
     override func accessibilityRole() -> NSAccessibility.Role? { .slider }
     override func accessibilityLabel() -> String? {
-        model.map { GraphModel.isLine($0.shown) ? "Pointer speed" : "Acceleration curve" }
+        model.map { GraphModel.isLine($0.shown) ? String(localized: "Pointer speed", comment: "Graph axis")
+                                                : String(localized: "Acceleration curve") }
     }
     override func accessibilityValue() -> Any? {
         guard let o = model?.shown else { return nil }
-        return GraphModel.isLine(o) ? String(format: "%.2f times", o.acceleration) : "Custom"
+        return GraphModel.isLine(o)
+            ? String(localized: "\(o.acceleration.formatted(.number.precision(.fractionLength(2)))) times", comment: "Spoken pointer speed")
+            : String(localized: "Custom", comment: "Spoken value of a custom acceleration curve")
     }
     override func accessibilityPerformIncrement() -> Bool { step(up: true) }
     override func accessibilityPerformDecrement() -> Bool { step(up: false) }

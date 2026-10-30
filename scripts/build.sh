@@ -57,6 +57,18 @@ rm -rf "$ICONS"
   "$HELPER/Contents/Info.plist"
 strip -x "$HELPER/Contents/MacOS/Meowse Settings"
 
+# Translations, from the catalog scripts/strings.sh keeps. Each language is a
+# small binary table, read the first time a string is shown. English is the
+# source text, so it has no table, but its folder lists it as a language.
+# Both apps get them: the Settings app looks strings up in its own bundle.
+STRINGS=$(mktemp -d)
+xcrun xcstringstool compile Resources/Localizable.xcstrings --output-directory "$STRINGS" --serialization-format binary
+mkdir -p "$STRINGS/en.lproj"
+for dir in "$APP/Contents/Resources" "$HELPER/Contents/Resources"; do
+  cp -R "$STRINGS"/*.lproj "$dir/"
+done
+rm -rf "$STRINGS"
+
 # The lid helper: a launchd daemon inside the app that macOS runs as root once
 # an administrator allows it, and then only while Meowse keeps the Mac awake
 # with the lid closed. It's named for the app, so a copy with another bundle

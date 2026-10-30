@@ -41,14 +41,14 @@ public struct KeyCombo: Codable, Hashable, Sendable {
         let cmd = CGEventFlags.maskCommand.rawValue, ctrl = CGEventFlags.maskControl.rawValue
         let shift = CGEventFlags.maskShift.rawValue
         return [
-            ("Back", KeyCombo(keyCode: 33, modifiers: cmd, key: "[")),
-            ("Forward", KeyCombo(keyCode: 30, modifiers: cmd, key: "]")),
-            ("Previous Tab", KeyCombo(keyCode: 48, modifiers: ctrl | shift, key: "⇥")),
-            ("Next Tab", KeyCombo(keyCode: 48, modifiers: ctrl, key: "⇥")),
-            ("Mission Control", KeyCombo(keyCode: 126, modifiers: ctrl, key: "↑")),
-            ("App Windows", KeyCombo(keyCode: 125, modifiers: ctrl, key: "↓")),
-            ("Space Left", KeyCombo(keyCode: 123, modifiers: ctrl, key: "←")),
-            ("Space Right", KeyCombo(keyCode: 124, modifiers: ctrl, key: "→")),
+            (String(localized: "Back", comment: "Mouse button action: go back, like ⌘["), KeyCombo(keyCode: 33, modifiers: cmd, key: "[")),
+            (String(localized: "Forward", comment: "Mouse button action: go forward, like ⌘]"), KeyCombo(keyCode: 30, modifiers: cmd, key: "]")),
+            (String(localized: "Previous Tab"), KeyCombo(keyCode: 48, modifiers: ctrl | shift, key: "⇥")),
+            (String(localized: "Next Tab"), KeyCombo(keyCode: 48, modifiers: ctrl, key: "⇥")),
+            (String(localized: "Mission Control"), KeyCombo(keyCode: 126, modifiers: ctrl, key: "↑")),
+            (String(localized: "App Windows", comment: "Mouse button action: macOS App Exposé"), KeyCombo(keyCode: 125, modifiers: ctrl, key: "↓")),
+            (String(localized: "Space Left", comment: "Mouse button action: move one desktop Space left"), KeyCombo(keyCode: 123, modifiers: ctrl, key: "←")),
+            (String(localized: "Space Right", comment: "Mouse button action: move one desktop Space right"), KeyCombo(keyCode: 124, modifiers: ctrl, key: "→")),
         ]
     }()
 
@@ -88,11 +88,11 @@ public enum MouseTrigger: Codable, Hashable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .button(2): return "Middle button"
-        case .button(3): return "Back side button"
-        case .button(4): return "Forward side button"
-        case .button(let n): return "Button \(n + 1)"
-        case .wheel(let left): return left ? "Side wheel left" : "Side wheel right"
+        case .button(2): return String(localized: "Middle button")
+        case .button(3): return String(localized: "Back side button")
+        case .button(4): return String(localized: "Forward side button")
+        case .button(let n): return String(localized: "Button \(n + 1)")
+        case .wheel(let left): return left ? String(localized: "Side wheel left") : String(localized: "Side wheel right")
         }
     }
 }

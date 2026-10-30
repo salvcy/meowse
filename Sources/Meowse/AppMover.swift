@@ -17,12 +17,12 @@ enum AppMover {
 
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Move Meowse to Applications?"
-        alert.informativeText = "Meowse is running from \(folder), where it can’t update itself."
-        alert.addButton(withTitle: "Move to Applications")
-        alert.addButton(withTitle: "Not Now")
+        alert.messageText = String(localized: "Move Meowse to Applications?")
+        alert.informativeText = String(localized: "Meowse is running from \(folder), where it can’t update itself.")
+        alert.addButton(withTitle: String(localized: "Move to Applications"))
+        alert.addButton(withTitle: String(localized: "Not Now"))
         alert.showsSuppressionButton = true
-        alert.suppressionButton?.title = "Don’t ask again"
+        alert.suppressionButton?.title = String(localized: "Don’t ask again")
         guard alert.runModal() == .alertFirstButtonReturn else {
             if alert.suppressionButton?.state == .on {
                 UserDefaults.standard.set(true, forKey: declinedKey)
@@ -35,8 +35,8 @@ enum AppMover {
             return true
         } catch {
             let failed = NSAlert()
-            failed.messageText = "Meowse couldn’t move itself to Applications."
-            failed.informativeText = "\(error.localizedDescription) You can drag Meowse there in Finder."
+            failed.messageText = String(localized: "Meowse couldn’t move itself to Applications.")
+            failed.informativeText = String(localized: "\(error.localizedDescription) You can drag Meowse there in Finder.", comment: "After the system's error message")
             failed.runModal()
             return false
         }
