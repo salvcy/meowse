@@ -26,10 +26,12 @@ public enum ScrollingPause: Equatable, Sendable {
     /// "Paused", "Idle (trackpad)".
     public var label: String {
         switch self {
-        case .waitingForAccess: return "Waiting for access"
-        case .paused: return "Paused"
-        case .failed: return "Couldn’t start"
-        case .idle(let touch): return touch.map { "Idle (\($0.name))" } ?? "Idle"
+        case .waitingForAccess: return String(localized: "Waiting for access", comment: "Scroll engine status")
+        case .paused: return String(localized: "Paused", comment: "Scroll engine status")
+        case .failed: return String(localized: "Couldn’t start", comment: "Scroll engine status")
+        case .idle(let touch):
+            return touch.map { String(localized: "Idle (\($0.name))", comment: "Scroll engine status, with what's scrolling") }
+                ?? String(localized: "Idle", comment: "Scroll engine status")
         }
     }
 }
@@ -57,11 +59,11 @@ public struct MenuBarStatus: Equatable, Sendable {
         if let pause {
             scrollingLabel = pause.label
         } else if !scrollingConfigured {
-            scrollingLabel = "Nothing enabled"
+            scrollingLabel = String(localized: "Nothing enabled", comment: "Scrolling status: no scrolling feature is turned on")
         } else if !running {
-            scrollingLabel = "Starting"
+            scrollingLabel = String(localized: "Starting", comment: "Scrolling status, for a moment while it starts")
         } else {
-            scrollingLabel = "On"
+            scrollingLabel = String(localized: "On", comment: "Scrolling status, as in “Scrolling: On”")
         }
     }
 }

@@ -40,12 +40,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             item.image = NSImage(systemSymbolName: symbol, accessibilityDescription: title)
             tabs.addTabViewItem(item)
         }
-        add("General", "gearshape", GeneralTab(store: store, requestPermission: requestPermission))
-        add("Mouse", "computermouse", MouseTab(store: store))
-        add("Scrolling", "scroll", ScrollingTab(store: store))
-        add("Hotkeys", "keyboard", HotkeysTab(store: store))
-        add("Awake", "cup.and.saucer", AwakeTab(store: store, awake: awake))
-        add("Updates", "arrow.down.circle", UpdatesTab(store: store, updater: updater))
+        add(String(localized: "General", comment: "Settings tab"), "gearshape", GeneralTab(store: store, requestPermission: requestPermission))
+        add(String(localized: "Mouse", comment: "Settings tab"), "computermouse", MouseTab(store: store))
+        add(String(localized: "Scrolling", comment: "Settings tab, and a menu section header with a switch"), "scroll", ScrollingTab(store: store))
+        add(String(localized: "Hotkeys", comment: "Settings tab"), "keyboard", HotkeysTab(store: store))
+        add(String(localized: "Awake", comment: "Settings tab for Keep Awake and Wiggle Cursor"), "cup.and.saucer", AwakeTab(store: store, awake: awake))
+        add(String(localized: "Updates", comment: "Settings tab"), "arrow.down.circle", UpdatesTab(store: store, updater: updater))
 
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]

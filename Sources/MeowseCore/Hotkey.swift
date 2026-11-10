@@ -42,14 +42,14 @@ public enum Hotkey: Codable, Hashable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .none: return "None"
+        case .none: return String(localized: "None", comment: "No hold key set")
         case .modifier(let key): return key.displayName
         case .mouseButton(let n):
             switch n {
-            case 2: return "Middle Button"
-            case 3: return "Back Button"
-            case 4: return "Forward Button"
-            default: return "Mouse Button \(n + 1)"
+            case 2: return String(localized: "Middle Button")
+            case 3: return String(localized: "Back Button")
+            case 4: return String(localized: "Forward Button")
+            default: return String(localized: "Mouse Button \(n + 1)")
             }
         }
     }
@@ -107,20 +107,31 @@ public enum ModifierKey: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// The name without "(either)", for a field that already shows the key.
+    public var plainName: String {
+        switch self {
+        case .shift: return String(localized: "⇧ Shift")
+        case .option: return String(localized: "⌥ Option")
+        case .command: return String(localized: "⌘ Command")
+        case .control: return String(localized: "⌃ Control")
+        default: return displayName
+        }
+    }
+
     public var displayName: String {
         switch self {
-        case .shift: return "⇧ Shift (either)"
-        case .leftShift: return "⇧ Left Shift"
-        case .rightShift: return "⇧ Right Shift"
-        case .option: return "⌥ Option (either)"
-        case .leftOption: return "⌥ Left Option"
-        case .rightOption: return "⌥ Right Option"
-        case .command: return "⌘ Command (either)"
-        case .leftCommand: return "⌘ Left Command"
-        case .rightCommand: return "⌘ Right Command"
-        case .control: return "⌃ Control (either)"
-        case .leftControl: return "⌃ Left Control"
-        case .rightControl: return "⌃ Right Control"
+        case .shift: return String(localized: "⇧ Shift (either)")
+        case .leftShift: return String(localized: "⇧ Left Shift")
+        case .rightShift: return String(localized: "⇧ Right Shift")
+        case .option: return String(localized: "⌥ Option (either)")
+        case .leftOption: return String(localized: "⌥ Left Option")
+        case .rightOption: return String(localized: "⌥ Right Option")
+        case .command: return String(localized: "⌘ Command (either)")
+        case .leftCommand: return String(localized: "⌘ Left Command")
+        case .rightCommand: return String(localized: "⌘ Right Command")
+        case .control: return String(localized: "⌃ Control (either)")
+        case .leftControl: return String(localized: "⌃ Left Control")
+        case .rightControl: return String(localized: "⌃ Right Control")
         }
     }
 }

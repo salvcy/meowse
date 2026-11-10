@@ -84,7 +84,7 @@ final class Updater: ObservableObject {
         if state == .installing { return }
         guard let repository,
               let url = URL(string: "https://api.github.com/repos/\(repository)/releases/latest") else {
-            if userInitiated { state = .failed("No update source is configured for this build.") }
+            if userInitiated { state = .failed(String(localized: "No update source is configured for this build.")) }
             return
         }
         if userInitiated {
@@ -288,16 +288,16 @@ private enum UpdateError: Error {
 
     var message: String {
         switch self {
-        case .offline: return "Couldn’t reach GitHub. Check your connection and try again."
-        case .noReleases: return "No releases have been published yet."
-        case .rateLimited: return "GitHub is limiting requests right now. Try again later."
-        case .server(let code): return "GitHub returned an error (\(code))."
-        case .malformed: return "The release information couldn’t be read."
-        case .checksumMismatch: return "The download was corrupted. Try again."
-        case .invalidArchive: return "The update package isn’t a valid Meowse release."
-        case .unsignedBuild: return "This build isn’t signed, so it can’t verify updates. Install the new version manually."
-        case .badSignature: return "The update isn’t signed by the Meowse developer, so it wasn’t installed."
-        case .notWritable(let url): return "Meowse can’t replace itself at \(url.deletingLastPathComponent().path). Download the update from the release page."
+        case .offline: return String(localized: "Couldn’t reach GitHub. Check your connection and try again.")
+        case .noReleases: return String(localized: "No releases have been published yet.")
+        case .rateLimited: return String(localized: "GitHub is limiting requests right now. Try again later.")
+        case .server(let code): return String(localized: "GitHub returned an error (\(code)).")
+        case .malformed: return String(localized: "The release information couldn’t be read.")
+        case .checksumMismatch: return String(localized: "The download was corrupted. Try again.")
+        case .invalidArchive: return String(localized: "The update package isn’t a valid Meowse release.")
+        case .unsignedBuild: return String(localized: "This build isn’t signed, so it can’t verify updates. Install the new version manually.")
+        case .badSignature: return String(localized: "The update isn’t signed by the Meowse developer, so it wasn’t installed.")
+        case .notWritable(let url): return String(localized: "Meowse can’t replace itself at \(url.deletingLastPathComponent().path). Download the update from the release page.")
         }
     }
 }

@@ -80,7 +80,7 @@ struct RecorderField: View {
         }
         .buttonStyle(.plain)
         .accessibilityValue(label ?? empty)
-        .accessibilityHint(recording ? prompt : "Records a new one")
+        .accessibilityHint(recording ? prompt : String(localized: "Records a new one"))
     }
 }
 
@@ -164,7 +164,8 @@ extension Hotkey {
     var fieldLabel: String? {
         switch self {
         case .none: return nil
-        default: return displayName.replacingOccurrences(of: " (either)", with: "")
+        case .modifier(let key): return key.plainName
+        default: return displayName
         }
     }
 }

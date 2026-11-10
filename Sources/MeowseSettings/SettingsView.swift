@@ -12,8 +12,13 @@ extension View {
     }
 }
 
-func caption(_ text: String) -> some View {
-    Text(text).font(.caption).foregroundStyle(.secondary)
+func caption(_ key: LocalizedStringKey) -> some View {
+    Text(key).font(.caption).foregroundStyle(.secondary)
+}
+
+/// Text that's already translated, such as a sentence put together in code.
+func caption(verbatim text: String) -> some View {
+    Text(verbatim: text).font(.caption).foregroundStyle(.secondary)
 }
 
 // MARK: - General
@@ -42,7 +47,8 @@ struct GeneralTab: View {
                         Label("Couldn’t start", systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                     case .off:
                         Text(ScrollingPause(trusted: store.accessibilityTrusted, enabled: store.settings.enabled,
-                                            engine: .off, device: nil, touch: nil)?.label ?? "Off (nothing enabled)")
+                                            engine: .off, device: nil, touch: nil)?.label
+                             ?? String(localized: "Off (nothing enabled)", comment: "Scroll engine status"))
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -105,8 +111,12 @@ struct ScrollingTab: View {
                 Group {
                     Toggle("Vertical", isOn: $store.settings.smoothVertical)
                     Toggle("Horizontal", isOn: $store.settings.smoothHorizontal)
-                    SliderRow("Scroll distance", value: $store.settings.notchDistance, range: Settings.notchDistanceRange, format: "%.0f pt")
-                    SliderRow("Smoothness", value: $store.settings.glideTime, range: Settings.glideTimeRange, format: "%.2f s")
+                    SliderRow("Scroll distance", value: $store.settings.notchDistance, range: Settings.notchDistanceRange) {
+                        String(localized: "\(Int($0.rounded())) pt", comment: "Scroll distance per wheel notch, in points")
+                    }
+                    SliderRow("Smoothness", value: $store.settings.glideTime, range: Settings.glideTimeRange) {
+                        String(localized: "\($0.formatted(.number.precision(.fractionLength(2)))) s", comment: "Glide time in seconds")
+                    }
                     Toggle("Trackpad-style momentum", isOn: $store.settings.trackpadPhases)
                         .help("Glides rubber-band at the ends of pages, like a trackpad.")
                 }
@@ -139,10 +149,10 @@ struct HotkeysTab: View {
     @ObservedObject var store: SettingsStore
     @StateObject private var capture = Capture()
 
-    private static let holdKeys: [(String, WritableKeyPath<MeowseCore.Settings, Hotkey>)] = [
-        ("Scroll faster", \.fasterKey),
-        ("Scroll sideways", \.sidewaysKey),
-        ("Scroll without smoothing", \.unsmoothedKey),
+    static let holdKeys: [(String, WritableKeyPath<MeowseCore.Settings, Hotkey>)] = [
+        (String(localized: "Scroll faster"), \.fasterKey),
+        (String(localized: "Scroll sideways"), \.sidewaysKey),
+        (String(localized: "Scroll without smoothing"), \.unsmoothedKey),
     ]
 
     var body: some View {
@@ -151,12 +161,18 @@ struct HotkeysTab: View {
                 ForEach(Self.holdKeys.indices, id: \.self) { i in
                     holdKey(i)
                 }
-                SliderRow("Faster by", value: $store.settings.fasterFactor, range: Settings.fasterFactorRange, format: "%.1f×")
+                SliderRow("Faster by", value: $store.settings.fasterFactor, range: Settings.fasterFactorRange) {
+                    $0.formatted(.number.precision(.fractionLength(1))) + "×"
+                }
                 Toggle("Stop glide on click", isOn: $store.settings.stopOnClick)
             } header: {
                 Text("Scroll")
             } footer: {
-                caption(sharedKey ?? "Hold these while scrolling. Click one, then press a modifier key or an extra mouse button. Right-click a modifier to use only its left or right key.")
+                if let sharedKey {
+                    caption(verbatim: sharedKey)
+                } else {
+                    caption("Hold these while scrolling. Click one, then press a modifier key or an extra mouse button. Right-click a modifier to use only its left or right key.")
+                }
             }
             .disabled(!store.settings.enabled)
 
@@ -171,7 +187,7 @@ struct HotkeysTab: View {
         let key = store.settings[keyPath: path]
         return LabeledContent(title) {
             HStack(spacing: 6) {
-                RecorderField(label: key.fieldLabel, empty: "Set key", prompt: "Press a key…",
+                RecorderField(label: key.fieldLabel, empty: String(localized: "Set key"), prompt: String(localized: "Press a key…"),
                               recording: capture.target == .hotkey(i)) {
                     capture.start(.hotkey(i)) { event in
                         guard let hotkey = Recorded.hotkey(event) else { return .keep }
@@ -186,7 +202,7 @@ struct HotkeysTab: View {
                         Button("Right Side Only") { store.settings[keyPath: path] = .modifier(m.right) }
                     }
                 }
-                ClearButton(help: "No key") { store.settings[keyPath: path] = .none }
+                ClearButton(help: String(localized: "No key")) { store.settings[keyPath: path] = .none }
                     .opacity(key == .none ? 0 : 1)
                     .disabled(key == .none)
             }
@@ -199,7 +215,8 @@ struct HotkeysTab: View {
         let keys = Self.holdKeys.map { ($0.0, s[keyPath: $0.1]) }
         for (i, a) in keys.enumerated() {
             for b in keys[(i + 1)...] where a.1.overlaps(b.1) {
-                return "\(a.0) and \(b.0.lowercased()) share a key, so holding it does both."
+                return String(localized: "“\(a.0)” and “\(b.0)” share a key, so holding it does both.",
+                              comment: "Two hold-key settings by name")
             }
         }
         return nil
@@ -227,7 +244,7 @@ private struct MouseButtonsSection: View {
         } header: {
             Text("Mouse buttons")
         } footer: {
-            if let note { caption(note) }
+            if let note { caption(verbatim: note) }
         }
     }
 
@@ -235,11 +252,11 @@ private struct MouseButtonsSection: View {
         LabeledContent(shortcut.trigger.displayName) {
             HStack(spacing: 6) {
                 if capture.target == .shortcut(shortcut.trigger) {
-                    RecorderField(label: nil, empty: "", prompt: "Type a shortcut…", recording: true) { capture.stop() }
+                    RecorderField(label: nil, empty: "", prompt: String(localized: "Type a shortcut…"), recording: true) { capture.stop() }
                 } else {
                     actions(shortcut)
                 }
-                ClearButton(help: "Remove") {
+                ClearButton(help: String(localized: "Remove")) {
                     store.settings.buttonShortcuts.removeAll { $0.trigger == shortcut.trigger }
                 }
             }
@@ -260,7 +277,7 @@ private struct MouseButtonsSection: View {
             Divider()
             Button("Record Shortcut…") { record(shortcut.trigger) }
         } label: {
-            Text(shortcut.keys?.name ?? "Choose…")
+            Text(shortcut.keys?.name ?? String(localized: "Choose…", comment: "Menu for a mouse button's action, before one is set"))
         }
         .fixedSize()
         .frame(minWidth: 140, alignment: .trailing)
@@ -306,12 +323,11 @@ private struct MouseButtonsSection: View {
     /// A button that's also held to scroll does both.
     private var note: String? {
         let s = store.settings
-        let holds: [(String, Hotkey)] = [("scroll faster", s.fasterKey), ("scroll sideways", s.sidewaysKey),
-                                         ("scroll without smoothing", s.unsmoothedKey)]
         for shortcut in s.buttonShortcuts where shortcut.keys != nil {
             guard case .button(let n) = shortcut.trigger,
-                  let hold = holds.first(where: { $0.1 == .mouseButton(n) }) else { continue }
-            return "\(shortcut.trigger.displayName) is also held to \(hold.0), so it does both."
+                  let hold = HotkeysTab.holdKeys.first(where: { s[keyPath: $0.1] == .mouseButton(n) }) else { continue }
+            return String(localized: "\(shortcut.trigger.displayName) is also set to “\(hold.0)”, so it does both.",
+                          comment: "A mouse button, then a hold-key setting by name")
         }
         return nil
     }
@@ -333,7 +349,11 @@ struct AwakeTab: View {
                 )) {
                     Text("Keep awake now")
                     if awake.isAwake {
-                        Text(awake.awakeUntil.map { "Until \($0.formatted(date: .omitted, time: .shortened))" } ?? "Until turned off")
+                        if let until = awake.awakeUntil {
+                            Text("Until \(until.formatted(date: .omitted, time: .shortened))")
+                        } else {
+                            Text("Until turned off")
+                        }
                     }
                 }
                 Toggle("Allow display to sleep", isOn: $store.settings.awakeAllowDisplaySleep)
@@ -478,7 +498,7 @@ private struct ExcludedApps: View {
                 Text("Excluded apps")
                 Spacer()
                 if !store.settings.excludedApps.isEmpty {
-                    Text("\(store.settings.excludedApps.count)").foregroundStyle(.secondary).monospacedDigit()
+                    Text(verbatim: "\(store.settings.excludedApps.count)").foregroundStyle(.secondary).monospacedDigit()
                 }
             }
             .contentShape(Rectangle())
@@ -517,8 +537,8 @@ private struct ExcludedApps: View {
         panel.allowedContentTypes = [.application]
         panel.allowsMultipleSelection = true
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.prompt = "Exclude"
-        panel.message = "Choose apps whose scrolling Meowse should leave alone."
+        panel.prompt = String(localized: "Exclude", comment: "Open panel button that adds apps to the excluded list")
+        panel.message = String(localized: "Choose apps whose scrolling Meowse should leave alone.")
         let add = { (response: NSApplication.ModalResponse) in
             guard response == .OK else { return }
             for url in panel.urls {
@@ -561,7 +581,7 @@ private struct EngineActivity: View {
     let surface: TouchKind?
 
     var body: some View {
-        let title = idle ? surface.map { "Idle (\($0.name))" } ?? "Idle" : "Running"
+        let title = idle ? ScrollingPause.idle(surface).label : String(localized: "Running", comment: "Scroll engine status")
         Label {
             Text(title)
         } icon: {
@@ -586,7 +606,7 @@ private struct ScrollPreview: View {
             VStack(alignment: .leading, spacing: 9) {
                 ForEach(0..<150, id: \.self) { i in
                     HStack(spacing: 12) {
-                        Text("\(i + 1)")
+                        Text(verbatim: "\(i + 1)")
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.tertiary)
                             .frame(width: 22, alignment: .trailing)
@@ -608,12 +628,12 @@ private struct ScrollPreview: View {
 }
 
 private struct SliderRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var value: Double
     let range: ClosedRange<Double>
-    let format: String
+    let format: (Double) -> String
 
-    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, format: String) {
+    init(_ title: LocalizedStringKey, value: Binding<Double>, range: ClosedRange<Double>, format: @escaping (Double) -> String) {
         self.title = title
         self._value = value
         self.range = range
@@ -624,10 +644,11 @@ private struct SliderRow: View {
         LabeledContent(title) {
             HStack {
                 Slider(value: $value, in: range)
-                Text(String(format: format, value))
+                Text(verbatim: format(value))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
-                    .frame(width: 64, alignment: .trailing)
+                    .fixedSize()
+                    .frame(minWidth: 64, alignment: .trailing)
             }
         }
     }
