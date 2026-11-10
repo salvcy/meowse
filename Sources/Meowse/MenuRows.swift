@@ -44,6 +44,28 @@ class MenuRow: NSView {
         if let symbol { setSymbol(symbol) }
         setAccessibilityElement(true)
         setAccessibilityLabel(text)
+        fit()
+    }
+
+    /// Room on the right for what the row draws there, with the margin.
+    var accessoryRoom: CGFloat { Grid.trailing }
+    /// The widest detail text the row is expected to show.
+    private var detailRoom: CGFloat = 0
+
+    /// Keeps room for the longest of these beside the title, so status text
+    /// isn't cut short in languages where it runs long.
+    func reserve(details: [String]) {
+        detailRoom = details.map { NSAttributedString(string: $0, attributes: [.font: font]).size().width }.max() ?? 0
+        fit()
+    }
+
+    /// A long title, as in some languages, widens the menu rather than run
+    /// into what's on the right. A menu is as wide as its widest row, and
+    /// English fits the standard width.
+    private func fit() {
+        let title = NSAttributedString(string: titleText, attributes: [.font: font]).size().width
+        let needed = (isHeader ? Grid.header : Grid.title) + indent + title + 8 + (detailRoom > 0 ? detailRoom + 8 : 0) + accessoryRoom
+        if needed > frame.width { frame.size.width = needed.rounded(.up) }
     }
 
     @available(*, unavailable)
@@ -68,6 +90,7 @@ class MenuRow: NSView {
         guard text != titleText else { return }
         titleText = text
         setAccessibilityLabel(text)
+        fit()
         needsDisplay = true
     }
 
@@ -159,11 +182,18 @@ final class ActionRow: MenuRow {
         setAccessibilityRole(.menuItem)
     }
 
+    private var trailingFont: NSFont { isBadge ? .systemFont(ofSize: 10, weight: .semibold) : .menuFont(ofSize: 0) }
+
+    override var accessoryRoom: CGFloat {
+        guard !trailing.isEmpty else { return Grid.trailing }
+        return Grid.trailing + NSAttributedString(string: trailing, attributes: [.font: trailingFont]).size().width + (isBadge ? 12 : 0)
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard !trailing.isEmpty else { return }
         let color: NSColor = isHighlighted ? .selectedMenuItemTextColor : isBadge ? .secondaryLabelColor : .tertiaryLabelColor
-        let font: NSFont = isBadge ? .systemFont(ofSize: 10, weight: .semibold) : .menuFont(ofSize: 0)
+        let font = trailingFont
         let text = NSAttributedString(string: trailing, attributes: [.font: font, .foregroundColor: color])
         let size = text.size()
         let pad: CGFloat = isBadge ? 6 : 0
@@ -226,6 +256,14 @@ final class ToggleRow: MenuRow {
         case .toggle: return right - Self.switchSize.width
         case .check: return right - 13
         case .none: return right
+        }
+    }
+
+    override var accessoryRoom: CGFloat {
+        switch accessory {
+        case .toggle: return Grid.trailing + Self.switchSize.width
+        case .check: return Grid.trailing + 13
+        case .none: return Grid.trailing
         }
     }
 
@@ -296,6 +334,8 @@ final class SubmenuRow: MenuRow {
         setAccessibilityRole(.menuItem)
     }
 
+    override var accessoryRoom: CGFloat { Grid.trailing + (Self.chevron?.size.width ?? 8) }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         guard let chevron = Self.chevron?.withSymbolConfiguration(.init(paletteColors: [contentColor])) else { return }
@@ -330,26 +370,36 @@ final class NoteRow: NSView {
         self.note = note
         self.action = action
         setAccessibilityLabel(action.isEmpty ? note : String(localized: "\(note). \(action)", comment: "VoiceOver: a status note, then its action"))
+        // A long note widens the menu, as a long title does.
+        let needed = textX + text.size().width + Grid.trailing
+        if needed > frame.width { frame.size.width = needed.rounded(.up) }
         needsDisplay = true
+    }
+
+    /// Under the title of the row above, after the warning icon.
+    private var textX: CGFloat {
+        Grid.title + (indented ? Grid.indent : 0) + (Self.warning.map { $0.size.width + 5 } ?? 0)
+    }
+
+    private var text: NSAttributedString {
+        let text = NSMutableAttributedString(string: note, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
+        if !action.isEmpty {
+            text.append(NSAttributedString(string: "  " + action, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                                                                                .foregroundColor: NSColor.controlAccentColor]))
+        }
+        return text
     }
 
     private static let warning = NSImage(systemSymbolName: "exclamationmark.triangle.fill", accessibilityDescription: nil)?
         .withSymbolConfiguration(.init(pointSize: 9, weight: .semibold).applying(.init(paletteColors: [.secondaryLabelColor])))
 
     override func draw(_ dirtyRect: NSRect) {
-        // Under the title of the row above.
-        var x = Grid.title + (indented ? Grid.indent : 0)
         if let warning = Self.warning {
-            warning.draw(in: NSRect(x: x, y: bounds.midY - warning.size.height / 2, width: warning.size.width, height: warning.size.height))
-            x += warning.size.width + 5
+            warning.draw(in: NSRect(x: Grid.title + (indented ? Grid.indent : 0), y: bounds.midY - warning.size.height / 2,
+                                    width: warning.size.width, height: warning.size.height))
         }
-        let font = NSFont.systemFont(ofSize: 11)
-        let text = NSMutableAttributedString(string: note, attributes: [.font: font, .foregroundColor: NSColor.secondaryLabelColor])
-        if !action.isEmpty {
-            text.append(NSAttributedString(string: "  " + action, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium),
-                                                                                .foregroundColor: NSColor.controlAccentColor]))
-        }
-        text.draw(at: NSPoint(x: x, y: bounds.midY - text.size().height / 2))
+        let text = self.text
+        text.draw(at: NSPoint(x: textX, y: bounds.midY - text.size().height / 2))
     }
 
     override func mouseUp(with event: NSEvent) {

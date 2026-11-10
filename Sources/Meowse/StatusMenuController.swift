@@ -198,6 +198,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(permissionSeparator)
 
         scrollingRow = ToggleRow(String(localized: "Scrolling", comment: "Settings tab, and a menu section header with a switch"))
+        // Room for its longest status, so none is cut short in any language.
+        scrollingRow.reserve(details: [ScrollingPause.waitingForAccess, .failed, .idle(.trackpad), .idle(.magicMouse)].map(\.label)
+            + [String(localized: "Nothing enabled", comment: "Scrolling status: no scrolling feature is turned on")])
         scrollingRow.onToggle = { [weak self] on in
             self?.store.settings.enabled = on
             self?.refresh()
@@ -238,6 +241,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     /// closed. Wiggle Cursor comes after, a feature of its own.
     private func buildAwake() {
         keepAwakeRow = ToggleRow(String(localized: "Keep Awake"), symbol: "cup.and.saucer")
+        let late = Calendar.current.date(bySettingHour: 22, minute: 45, second: 0, of: Date()) ?? Date()
+        keepAwakeRow.reserve(details: [Awake.remainingLabel(119 * 60),
+                                       String(localized: "Until \(late.formatted(date: .omitted, time: .shortened))")])
         keepAwakeRow.onToggle = { [weak self] on in
             guard let self else { return }
             on ? self.awake.startAwake(duration: 0, allowDisplaySleep: self.store.settings.awakeAllowDisplaySleep)
@@ -276,6 +282,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.addItem(untilItem)
 
         optionsRow = DisclosureRow(String(localized: "Options", comment: "Shows more Keep Awake options"))
+        optionsRow.reserve(details: [String(localized: "\(2) on", comment: "How many Options switches are on: “1 on”")])
         optionsRow.isOpen = UserDefaults.standard.bool(forKey: Self.optionsOpenKey)
         optionsRow.onToggle = { [weak self] open in
             UserDefaults.standard.set(open, forKey: Self.optionsOpenKey)
