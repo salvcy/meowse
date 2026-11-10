@@ -2606,7 +2606,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zezwól na dostęp do dostępności…"
+            "value" : "Zezwól na dostęp w „Dostępności”…"
           }
         },
         "pt-BR" : {
@@ -2636,7 +2636,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Дозволити доступ до доступності…"
+            "value" : "Надати доступ у «Доступності»…"
           }
         },
         "zh-Hans" : {
@@ -2764,7 +2764,7 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Να επιτρέπεται η νάρκη οθόνης"
+            "value" : "Να επιτρέπεται ο ύπνος της οθόνης"
           }
         },
         "es" : {
@@ -2964,7 +2964,7 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Να επιτρέπεται η νάρκη οθόνης"
+            "value" : "Να επιτρέπεται ο ύπνος της οθόνης"
           }
         },
         "es" : {
@@ -3296,7 +3296,7 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "깨어 있기"
+            "value" : "잠자기 방지"
           }
         },
         "nl" : {
@@ -5394,13 +5394,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "早く"
+            "value" : "早める"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이르게"
+            "value" : "앞당기기"
           }
         },
         "nl" : {
@@ -5464,7 +5464,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beide Seiten"
+            "value" : "Links oder rechts"
           }
         },
         "el" : {
@@ -5482,7 +5482,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Les deux côtés"
+            "value" : "Gauche ou droite"
           }
         },
         "id" : {
@@ -5500,13 +5500,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "양쪽 모두"
+            "value" : "왼쪽 또는 오른쪽"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Beide kanten"
+            "value" : "Links of rechts"
           }
         },
         "pl" : {
@@ -5536,7 +5536,7 @@
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Her İki Taraf"
+            "value" : "Herhangi Bir Taraf"
           }
         },
         "uk" : {
@@ -7293,7 +7293,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diam"
+            "value" : "Tidak aktif"
           }
         },
         "ja" : {
@@ -7394,7 +7394,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diam (%@)"
+            "value" : "Tidak aktif (%@)"
           }
         },
         "ja" : {
@@ -7701,7 +7701,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "インストールして再起動"
+            "value" : "インストールして再度開く"
           }
         },
         "ko" : {
@@ -7755,7 +7755,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装并重新启动"
+            "value" : "安装并重新打开"
           }
         },
         "zh-Hant" : {
@@ -9001,13 +9001,13 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "遅く"
+            "value" : "遅らせる"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "늦게"
+            "value" : "늦추기"
           }
         },
         "nl" : {
@@ -10669,7 +10669,105 @@
       }
     },
     "Mouse shortcuts: On" : {
-      "comment" : "Menu bar icon tooltip"
+      "comment" : "Menu bar icon tooltip",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maus-Kurzbefehle: An"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Muissneltoetsen: aan"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Raccourcis de souris : activés"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atajos del ratón: activados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalhos do mouse: ativados"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atalhos do rato: ativados"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сочетания кнопок мыши: вкл."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скорочення кнопок миші: увімк."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Skróty myszy: wł."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Συντομεύσεις ποντικιού: Ενεργές"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fare kısayolları: Açık"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pintasan mouse: Aktif"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マウスのショートカット：オン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "마우스 단축키: 켬"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "鼠标快捷键：开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "滑鼠快速鍵：開"
+          }
+        }
+      }
     },
     "Mouse speed" : {
       "comment" : "Graph axis",
@@ -10983,7 +11081,7 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Μετακινεί τον δείκτη κατά ένα σημείο και πίσω όταν είστε αδρανείς, ώστε να παραμένετε ενεργοί σε εφαρμογές συνομιλίας και η οθόνη να μένει αναμμένη. Σε παύση όταν η οθόνη είναι κλειδωμένη ή σε νάρκη."
+            "value" : "Μετακινεί τον δείκτη κατά ένα σημείο και πίσω όταν είστε αδρανείς, ώστε να παραμένετε ενεργοί σε εφαρμογές συνομιλίας και η οθόνη να μένει αναμμένη. Σε παύση όταν η οθόνη είναι κλειδωμένη ή σε ύπνο."
           }
         },
         "es" : {
@@ -11001,7 +11099,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menggeser penunjuk satu poin lalu kembali setelah Anda diam, agar Anda tetap aktif di app obrolan dan layar tetap menyala. Dijeda saat layar terkunci atau tidur."
+            "value" : "Menggeser penunjuk satu poin lalu kembali setelah Anda tidak aktif, agar Anda tetap aktif di app obrolan dan layar tetap menyala. Dijeda saat layar terkunci atau tidur."
           }
         },
         "ja" : {
@@ -11208,7 +11306,7 @@
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新規"
+            "value" : "新着"
           }
         },
         "ko" : {
@@ -11975,7 +12073,105 @@
       }
     },
     "Nothing enabled" : {
-      "comment" : "Scrolling status: no scrolling feature is turned on"
+      "comment" : "Scrolling status: no scrolling feature is turned on",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nichts aktiviert"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Niets ingeschakeld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien d’activé"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada activado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada ativado"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nada ativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ничего не включено"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нічого не ввімкнено"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nic nie jest włączone"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Καμία λειτουργία ενεργή"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiçbir şey etkin değil"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tidak ada yang aktif"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効な機能なし"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화된 항목 없음"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未启用任何功能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未啟用任何功能"
+          }
+        }
+      }
     },
     "Off (nothing enabled)" : {
       "comment" : "Scroll engine status",
@@ -11989,7 +12185,7 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ανενεργό (τίποτα ενεργοποιημένο)"
+            "value" : "Ανενεργό (καμία λειτουργία ενεργή)"
           }
         },
         "es" : {
@@ -12179,7 +12375,105 @@
       }
     },
     "On" : {
-      "comment" : "Scrolling status, as in “Scrolling: On”"
+      "comment" : "Scrolling status, as in “Scrolling: On”",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aan"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activé"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Activado"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativada"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ativado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вкл."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увімк."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wł."
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ενεργή"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açık"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktif"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "켬"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開"
+          }
+        }
+      }
     },
     "Only external mice" : {
       "localizations" : {
@@ -12404,7 +12698,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrir Ouverture…"
+            "value" : "Ouvrir « Ouverture »…"
           }
         },
         "id" : {
@@ -12434,7 +12728,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Otwórz rzeczy otwierane podczas logowania…"
+            "value" : "Otwórz „Rzeczy otwierane podczas logowania”…"
           }
         },
         "pt-BR" : {
@@ -12884,7 +13178,105 @@
       }
     },
     "Pointer settings: Applied" : {
-      "comment" : "Menu bar icon tooltip: Meowse's pointer speed or curve is in use"
+      "comment" : "Menu bar icon tooltip: Meowse's pointer speed or curve is in use",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigereinstellungen: Angewendet"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aanwijzerinstellingen: toegepast"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages du pointeur : appliqués"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes del puntero: aplicados"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajustes do cursor: aplicados"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Definições do cursor: aplicadas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Настройки указателя: применены"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Параметри вказівника: застосовано"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ustawienia wskaźnika: zastosowane"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ρυθμίσεις δείκτη: Εφαρμόστηκαν"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "İmleç ayarları: Uygulandı"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pengaturan penunjuk: Diterapkan"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ポインタ設定：適用中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "포인터 설정: 적용됨"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指针设置：已应用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "指標設定：已套用"
+          }
+        }
+      }
     },
     "Pointer speed" : {
       "comment" : "Graph axis",
@@ -14458,7 +14850,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Обратная горизонталь"
+            "value" : "Инверсия по горизонтали"
           }
         },
         "tr" : {
@@ -14470,7 +14862,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Зворотна горизонталь"
+            "value" : "Інверсія по горизонталі"
           }
         },
         "zh-Hans" : {
@@ -14558,7 +14950,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Обратная вертикаль"
+            "value" : "Инверсия по вертикали"
           }
         },
         "tr" : {
@@ -14570,7 +14962,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Зворотна вертикаль"
+            "value" : "Інверсія по вертикалі"
           }
         },
         "zh-Hans" : {
@@ -16001,7 +16393,7 @@
         "el" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ορίστε μια ώρα από τη γραμμή μενού. Οι χρονομετρημένες συνεδρίες λήγουν κανονικά ακόμη κι αν τερματιστεί το Meowse. Με κλειστό καπάκι, το Mac μπαίνει σε νάρκη αν η μπαταρία πέσει στο %lld%%."
+            "value" : "Ορίστε μια ώρα από τη γραμμή μενού. Οι χρονομετρημένες συνεδρίες λήγουν κανονικά ακόμη κι αν τερματιστεί το Meowse. Με κλειστό καπάκι, το Mac τίθεται σε ύπνο αν η μπαταρία πέσει στο %lld%%."
           }
         },
         "es" : {
@@ -17595,7 +17987,105 @@
       }
     },
     "Starting" : {
-      "comment" : "Scrolling status, for a moment while it starts"
+      "comment" : "Scrolling status, for a moment while it starts",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Startet"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starten"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando"
+          }
+        },
+        "pt-PT" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A iniciar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запуск"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uruchamianie"
+          }
+        },
+        "el" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Εκκίνηση"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Başlatılıyor"
+          }
+        },
+        "id" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Memulai"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開始中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시작 중"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在启动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在啟動"
+          }
+        }
+      }
     },
     "Status" : {
       "localizations" : {
@@ -18644,7 +19134,7 @@
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Momentum zoals een trackpad"
+            "value" : "Momentum zoals bij een trackpad"
           }
         },
         "pl" : {
@@ -18980,7 +19470,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Увімкніть Meowse у «Системні параметри» → «Приватність і безпека» → «Доступність». Зміна набуде чинності за кілька секунд."
+            "value" : "Увімкніть Meowse в розділі «Системні параметри» → «Приватність і безпека» → «Доступність». Зміна набуде чинності за кілька секунд."
           }
         },
         "zh-Hans" : {
@@ -20429,7 +20919,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Saat diam selama"
+            "value" : "Saat tidak aktif selama"
           }
         },
         "ja" : {
@@ -20629,7 +21119,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Goyang Saat Diam Selama"
+            "value" : "Goyang Saat Tidak Aktif Selama"
           }
         },
         "ja" : {
@@ -20829,7 +21319,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Menggoyang kursor saat diam"
+            "value" : "Menggoyang kursor saat tidak aktif"
           }
         },
         "ja" : {
@@ -21123,7 +21613,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "macOS demande une seule fois à un administrateur de l’autoriser, dans Ouverture."
+            "value" : "macOS demande une seule fois à un administrateur de l’autoriser, dans « Ouverture »."
           }
         },
         "id" : {
@@ -21153,7 +21643,7 @@
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "macOS raz poprosi administratora o zgodę w rzeczach otwieranych podczas logowania."
+            "value" : "macOS raz poprosi administratora o zgodę w „Rzeczach otwieranych podczas logowania”."
           }
         },
         "pt-BR" : {
@@ -21914,7 +22404,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⇧ Umschalt (beide)"
+            "value" : "⇧ Umschalt (links oder rechts)"
           }
         },
         "el" : {
@@ -21932,7 +22422,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⇧ Maj (les deux)"
+            "value" : "⇧ Maj (gauche ou droite)"
           }
         },
         "id" : {
@@ -21950,13 +22440,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⇧ Shift(양쪽)"
+            "value" : "⇧ Shift(왼쪽 또는 오른쪽)"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⇧ Shift (beide)"
+            "value" : "⇧ Shift (links of rechts)"
           }
         },
         "pl" : {
@@ -22114,7 +22604,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌃ Control (beide)"
+            "value" : "⌃ Control (links oder rechts)"
           }
         },
         "el" : {
@@ -22132,7 +22622,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌃ Contrôle (les deux)"
+            "value" : "⌃ Contrôle (gauche ou droite)"
           }
         },
         "id" : {
@@ -22150,13 +22640,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌃ Control(양쪽)"
+            "value" : "⌃ Control(왼쪽 또는 오른쪽)"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌃ Control (beide)"
+            "value" : "⌃ Control (links of rechts)"
           }
         },
         "pl" : {
@@ -22514,7 +23004,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘ Befehl (beide)"
+            "value" : "⌘ Befehl (links oder rechts)"
           }
         },
         "el" : {
@@ -22532,7 +23022,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘ Commande (les deux)"
+            "value" : "⌘ Commande (gauche ou droite)"
           }
         },
         "id" : {
@@ -22550,13 +23040,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘ Command(양쪽)"
+            "value" : "⌘ Command(왼쪽 또는 오른쪽)"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘ Command (beide)"
+            "value" : "⌘ Command (links of rechts)"
           }
         },
         "pl" : {
@@ -23014,7 +23504,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌥ Wahl (beide)"
+            "value" : "⌥ Wahl (links oder rechts)"
           }
         },
         "el" : {
@@ -23032,7 +23522,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌥ Option (les deux)"
+            "value" : "⌥ Option (gauche ou droite)"
           }
         },
         "id" : {
@@ -23050,13 +23540,13 @@
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌥ Option(양쪽)"
+            "value" : "⌥ Option(왼쪽 또는 오른쪽)"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌥ Option (beide)"
+            "value" : "⌥ Option (links of rechts)"
           }
         },
         "pl" : {
