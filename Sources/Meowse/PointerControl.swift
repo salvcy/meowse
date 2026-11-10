@@ -134,7 +134,13 @@ final class PointerControl {
 
     @discardableResult
     private func set(_ mouse: IOHIDServiceClient, _ id: UInt64, _ o: PointerOverride) -> Bool {
-        let fixed = { (v: Double) in NSNumber(value: Int64((v * 65536).rounded())) }
+        // 16.16 fixed point. A curve fitted to stored points that were edited
+        // by hand can come out huge or not a number, which Int64() would trap on.
+        let fixed = { (v: Double) -> NSNumber in
+            let scaled = (v * 65536).rounded()
+            guard scaled.isFinite else { return 0 }
+            return NSNumber(value: Int64(max(-2147483648, min(2147483647, scaled))))
+        }
         func dictionary(_ c: PointerCurves.Parametric) -> [String: NSNumber] {
             ["HIDAccelIndex": fixed(c.index), "HIDAccelGainLinear": fixed(c.gainLinear),
              "HIDAccelGainParabolic": fixed(c.gainParabolic), "HIDAccelGainCubic": fixed(c.gainCubic),

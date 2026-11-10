@@ -149,6 +149,10 @@ final class Updater: ObservableObject {
 
     func install() {
         guard let release, let asset = release.archive, state != .installing else { return }
+        guard let repository, asset.isDownload(of: repository) else {
+            state = .failed(UpdateError.invalidArchive.message)
+            return
+        }
         let appURL = Bundle.main.bundleURL
         state = .installing
 

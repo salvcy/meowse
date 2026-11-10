@@ -18,6 +18,14 @@ public struct KeyCombo: Codable, Hashable, Sendable {
         self.key = key
     }
 
+    /// Stored values can be edited by hand; they get the same mask.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(keyCode: try c.decode(UInt16.self, forKey: .keyCode),
+                  modifiers: try c.decode(UInt64.self, forKey: .modifiers),
+                  key: try c.decode(String.self, forKey: .key))
+    }
+
     /// Flags for posting it. A keyboard marks the arrows, and the keys an
     /// Fn key reaches on a laptop, with the function flag (the arrows with
     /// the keypad flag too); system shortcuts such as Mission Control's ⌃↑

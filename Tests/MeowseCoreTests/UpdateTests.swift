@@ -55,4 +55,17 @@ final class UpdateTests: XCTestCase {
         XCTAssertEqual(r.archive?.name, "Meowse.zip")
         XCTAssertNil(r.archive?.digest)
     }
+
+    func testDownloadsOnlyFromTheRepositoryOnGitHub() throws {
+        func asset(_ url: String) throws -> Release.Asset {
+            try release(assets: #"[{"name":"Meowse.zip","browser_download_url":"\#(url)","size":1}]"#).archive!
+        }
+        XCTAssertTrue(try asset("https://github.com/o/r/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertTrue(try asset("https://github.com/O/R/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertFalse(try asset("http://github.com/o/r/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertFalse(try asset("https://github.com.evil.example/o/r/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertFalse(try asset("https://github.com@evil.example/o/r/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertFalse(try asset("https://github.com/someone/else/releases/download/v0.2.0/Meowse.zip").isDownload(of: "o/r"))
+        XCTAssertFalse(try asset("file:///tmp/Meowse.zip").isDownload(of: "o/r"))
+    }
 }

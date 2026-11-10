@@ -318,4 +318,11 @@ final class ShortcutTests: XCTestCase {
         let line = try XCTUnwrap(SettingsLink.encode(ToSettings.state(state)))
         XCTAssertEqual(SettingsLink.decode(ToSettings.self, from: line.dropLast()), .state(state))
     }
+
+    func testStoredShortcutKeepsOnlyTheFourModifiers() throws {
+        let stored = Data(#"{"keyCode":13,"modifiers":18446744073709551615,"key":"W"}"#.utf8)
+        let keys = try JSONDecoder().decode(KeyCombo.self, from: stored)
+        XCTAssertEqual(keys.modifiers, KeyCombo.modifierMask)
+        XCTAssertEqual(try JSONDecoder().decode(KeyCombo.self, from: JSONEncoder().encode(keys)), keys)
+    }
 }

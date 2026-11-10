@@ -41,6 +41,14 @@ public struct Release: Decodable, Sendable {
             case name, size, digest
             case url = "browser_download_url"
         }
+
+        /// Whether it's a file of `repository`'s releases on GitHub, over
+        /// HTTPS. The release information names the address, so it's checked
+        /// before anything is fetched from it.
+        public func isDownload(of repository: String) -> Bool {
+            url.scheme == "https" && url.host == "github.com" && url.user == nil && url.port == nil
+                && url.path.lowercased().hasPrefix("/\(repository.lowercased())/releases/download/")
+        }
     }
 
     public let tag: String
